@@ -19,6 +19,9 @@
             --danger-color: #e74c3c;
             --approval-color: #f39c12;
             --highlight-color: #dbe9f6;
+            /* ★新規追加: 不整合行のハイライト色 */
+            --invalid-row-bg: #fff0f1;
+            --invalid-row-text: #d9534f;
             --font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
         }
 
@@ -144,6 +147,7 @@
             background-color: #bdc3c7;
             cursor: not-allowed;
             transform: none;
+            box-shadow: none;
         }
         button .icon {
             width: 20px;
@@ -230,6 +234,15 @@
         .record-table tbody tr.selected-row {
             background-color: var(--highlight-color);
         }
+        /* ★新規追加: 不整合行のスタイル */
+        .record-table tbody tr.invalid-row {
+            background-color: var(--invalid-row-bg) !important;
+            color: var(--invalid-row-text);
+        }
+        .record-table tbody tr.invalid-row:hover {
+            background-color: #fdd !important;
+        }
+
         
         .form-wrapper {
             position: absolute;
@@ -777,9 +790,9 @@
             throw new Error(result.error || 'kintoneマスタの取得に失敗しました。');
         }
 
-        masterData.client = result.data.customers.map(c => c.name);
+        masterData.client = result.data.customers;
         masterData.product = result.data.products; // {name, number} の配列
-        masterData.unit = result.data.units.map(u => u.name);
+        masterData.unit = result.data.units;
 
         masterChoices.client.setChoices(masterData.client.map(c => ({ value: c, label: c })), 'value', 'label', true);
         masterChoices.product.setChoices(masterData.product.map(p => ({ value: p.name, label: p.name })), 'value', 'label', true);
@@ -1125,7 +1138,6 @@
             if (kintoneRecord.deliveryDate) {
                 kintoneRecord.deliveryDate = formatDateForInput(kintoneRecord.deliveryDate);
             }
-            // ★修正: 商品名から商品番号を検索して追加
             const productInfo = masterData.product.find(p => p.name === r.product);
             kintoneRecord.productNumber = productInfo ? productInfo.number : null;
             return kintoneRecord;
