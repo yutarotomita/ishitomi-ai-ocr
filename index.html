@@ -19,7 +19,6 @@
             --danger-color: #e74c3c;
             --approval-color: #f39c12;
             --highlight-color: #dbe9f6;
-            /* ★新規追加: 不整合行のハイライト色 */
             --invalid-row-bg: #fff0f1;
             --invalid-row-text: #d9534f;
             --font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
@@ -234,15 +233,23 @@
         .record-table tbody tr.selected-row {
             background-color: var(--highlight-color);
         }
-        /* ★新規追加: 不整合行のスタイル */
         .record-table tbody tr.invalid-row {
             background-color: var(--invalid-row-bg) !important;
-            color: var(--invalid-row-text);
         }
         .record-table tbody tr.invalid-row:hover {
             background-color: #fdd !important;
         }
-
+        /* ★修正: 不整合セルのスタイル */
+        .record-table tbody td.invalid-cell {
+            color: var(--invalid-row-text);
+            font-weight: bold;
+        }
+        .record-table tbody tr.invalid-row td {
+            color: var(--text-color); /* 不整合行でも正常なセルは黒文字 */
+        }
+        .record-table tbody tr.invalid-row td.invalid-cell {
+            color: var(--invalid-row-text); /* 不整合セルだけ赤文字 */
+        }
         
         .form-wrapper {
             position: absolute;
@@ -893,11 +900,19 @@
         filteredSheetData.forEach(record => {
             const tr = document.createElement('tr');
             tr.dataset.recordId = record.id;
-            tr.innerHTML = createRowHtml(record);
-
+            
             const isClientInvalid = !masterData.client.includes(record.client);
             const isProductInvalid = !productMasterNames.includes(record.product);
             const isUnitInvalid = !masterData.unit.includes(record.unit);
+
+            tr.innerHTML = `
+                <td class="${isClientInvalid ? 'invalid-cell' : ''}">${record.client}</td>
+                <td>${record.deliveryDate}</td>
+                <td class="${isProductInvalid ? 'invalid-cell' : ''}">${record.product}</td>
+                <td>${record.notes}</td>
+                <td>${record.quantity}</td>
+                <td class="${isUnitInvalid ? 'invalid-cell' : ''}">${record.unit}</td>
+            `;
 
             if (isClientInvalid || isProductInvalid || isUnitInvalid) {
                 tr.classList.add('invalid-row');
@@ -913,17 +928,6 @@
         });
 
         approveButton.disabled = hasInvalidRow;
-    }
-
-    function createRowHtml(record) {
-        return `
-            <td>${record.client}</td>
-            <td>${record.deliveryDate}</td>
-            <td>${record.product}</td>
-            <td>${record.notes}</td>
-            <td>${record.quantity}</td>
-            <td>${record.unit}</td>
-        `;
     }
 
     function displayRecord(recordId) {
