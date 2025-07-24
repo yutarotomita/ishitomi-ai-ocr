@@ -883,18 +883,36 @@
         recordTableBody.innerHTML = '';
         if (filteredSheetData.length === 0) {
             recordTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">このファイルに対応するレコードはありません。</td></tr>';
+            approveButton.disabled = true;
             return;
         }
+
+        let hasInvalidRow = false;
+        const productMasterNames = masterData.product.map(p => p.name);
+
         filteredSheetData.forEach(record => {
             const tr = document.createElement('tr');
             tr.dataset.recordId = record.id;
             tr.innerHTML = createRowHtml(record);
+
+            const isClientInvalid = !masterData.client.includes(record.client);
+            const isProductInvalid = !productMasterNames.includes(record.product);
+            const isUnitInvalid = !masterData.unit.includes(record.unit);
+
+            if (isClientInvalid || isProductInvalid || isUnitInvalid) {
+                tr.classList.add('invalid-row');
+                tr.title = 'マスタデータと不整合があります';
+                hasInvalidRow = true;
+            }
+
             tr.addEventListener('click', () => displayRecord(record.id));
             tr.addEventListener('dblclick', () => {
                 formWrapper.classList.toggle('open');
             });
             recordTableBody.appendChild(tr);
         });
+
+        approveButton.disabled = hasInvalidRow;
     }
 
     function createRowHtml(record) {
