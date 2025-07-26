@@ -170,9 +170,26 @@
             margin-bottom: 25px;
             flex-shrink: 0;
         }
+        .file-selector-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-grow: 1;
+        }
         .file-selector-pane {
             flex-grow: 1;
         }
+        #delete-file-button {
+            padding: 8px;
+            background-color: transparent;
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+        }
+        #delete-file-button:hover {
+            background-color: var(--danger-color);
+            color: white;
+        }
+
         .top-pane {
             display: flex;
             gap: 25px;
@@ -214,6 +231,11 @@
             border-bottom: 1px solid var(--border-color);
             white-space: nowrap;
         }
+        /* ★修正: チェックボックスセルのスタイル */
+        .record-table th:first-child, .record-table td:first-child {
+            width: 40px;
+            text-align: center;
+        }
         .record-table thead th {
             background-color: #f8f9fa;
             position: sticky;
@@ -239,16 +261,15 @@
         .record-table tbody tr.invalid-row:hover {
             background-color: #fdd !important;
         }
-        /* ★修正: 不整合セルのスタイル */
         .record-table tbody td.invalid-cell {
             color: var(--invalid-row-text);
             font-weight: bold;
         }
         .record-table tbody tr.invalid-row td {
-            color: var(--text-color); /* 不整合行でも正常なセルは黒文字 */
+            color: var(--text-color);
         }
         .record-table tbody tr.invalid-row td.invalid-cell {
-            color: var(--invalid-row-text); /* 不整合セルだけ赤文字 */
+            color: var(--invalid-row-text);
         }
         
         .form-wrapper {
@@ -462,8 +483,8 @@
             <input type="text" id="sheet-id" placeholder="スプレッドシートのURLからIDをコピー">
         </div>
         <div class="input-group">
-            <label for="data-range">発注データ範囲 (例: [テーブル]発注データ!A:H)</label>
-            <input type="text" id="data-range" value="[テーブル]発注データ!A:H">
+            <label for="data-range">発注データ範囲 (例: [テーブル]発注データ!A:I)</label>
+            <input type="text" id="data-range" value="[テーブル]発注データ!A:I">
         </div>
         
         <h3>kintone & GAS</h3>
@@ -490,14 +511,19 @@
         <h2>STEP 2: データ確認と修正</h2>
         
         <div class="header-pane">
-            <div class="file-selector-pane input-group">
-                <label for="image-file-selector">表示する発注書ファイルを選択</label>
-                <select id="image-file-selector"></select>
+            <div class="file-selector-container">
+                <div class="file-selector-pane input-group">
+                    <label for="image-file-selector">表示する発注書ファイルを選択</label>
+                    <select id="image-file-selector"></select>
+                </div>
+                <button id="delete-file-button" title="このファイルを削除（非表示に）します">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
             </div>
             <div class="approval-action">
                 <button id="approve-button">
                     <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>
-                    この発注書を承認
+                    選択した行を承認
                 </button>
             </div>
         </div>
@@ -510,6 +536,8 @@
                 <table class="record-table">
                     <thead>
                         <tr>
+                            <!-- ★修正: ヘッダーにチェックボックスを追加 -->
+                            <th><input type="checkbox" id="select-all-checkbox" title="すべて選択/解除"></th>
                             <th>取引先名</th>
                             <th>納品日付</th>
                             <th>商品名</th>
@@ -610,7 +638,8 @@
         'gas-app-url', 'kintone-api-user', 'kintone-api-password'
     ];
     const GAPI_SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly';
-    const STATUS_COL_INDEX = 7; // H列 (0-indexed)
+    const STATUS_COL_INDEX = 7; // H列
+    const ACTIVE_FLAG_COL_INDEX = 8; // I列
 
     // --- DOM要素の取得 ---
     const configSection = document.getElementById('config-section');
@@ -635,6 +664,8 @@
     const formWrapper = document.getElementById('form-wrapper');
     const formToggleHeader = document.getElementById('form-toggle-header');
     const topPane = document.querySelector('.top-pane');
+    const deleteFileButton = document.getElementById('delete-file-button');
+    const selectAllCheckbox = document.getElementById('select-all-checkbox');
 
     let gapiInited = false;
     let gsiInited = false;
@@ -648,7 +679,8 @@
     let masterData = { client: [], product: [], unit: [] };
     let sheetGid = null;
     let imageFileChoices;
-
+    let selectedRowIds = new Set();
+    
     // --- 初期化処理 ---
     window.onload = () => {
         CONFIG_KEYS.forEach(key => {
@@ -671,6 +703,7 @@
     addNewButton.addEventListener('click', prepareNewRecord);
     deleteButton.addEventListener('click', () => showConfirmModal('delete'));
     approveButton.addEventListener('click', () => showConfirmModal('approve'));
+    deleteFileButton.addEventListener('click', () => showConfirmModal('deleteFile'));
     cancelActionButton.addEventListener('click', () => confirmModal.classList.add('hidden'));
     imageFileSelector.addEventListener('change', handleImageFileSelection);
     formToggleHeader.addEventListener('click', () => {
@@ -682,6 +715,20 @@
                  formWrapper.classList.remove('open');
             }
         }
+    });
+    selectAllCheckbox.addEventListener('change', (e) => {
+        const isChecked = e.target.checked;
+        const rowCheckboxes = recordTableBody.querySelectorAll('.row-checkbox');
+        rowCheckboxes.forEach(checkbox => {
+            checkbox.checked = isChecked;
+            const rowId = parseInt(checkbox.closest('tr').dataset.recordId, 10);
+            if (isChecked) {
+                selectedRowIds.add(rowId);
+            } else {
+                selectedRowIds.delete(rowId);
+            }
+        });
+        updateSelectionUI();
     });
 
 
@@ -837,9 +884,10 @@
                 quantity: row[4] || '',
                 unit: row[5] || '',
                 fileId: row[6] || '',
-                status: row[STATUS_COL_INDEX] || ''
+                status: row[STATUS_COL_INDEX] || '',
+                active: row[ACTIVE_FLAG_COL_INDEX] === undefined ? '1' : String(row[ACTIVE_FLAG_COL_INDEX]) // I列が空なら有効(1)
             }))
-            .filter(record => String(record.status || '').trim() != '2');
+            .filter(record => String(record.status || '').trim() != '2' && record.active == '1');
     }
     
     async function loadImageFiles() {
@@ -848,7 +896,7 @@
         if (uniqueFileIds.length === 0) {
             imageFileChoices.clearStore();
             imageFileChoices.setChoices([{ value: '', label: '処理対象のファイルがありません', disabled: true }], 'value', 'label', true);
-            recordTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">処理対象のレコードはありません。</td></tr>';
+            recordTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">処理対象のレコードはありません。</td></tr>';
             prepareNewRecord();
             return;
         }
@@ -880,7 +928,7 @@
         populateRecordTable();
 
         if (filteredSheetData.length > 0) {
-            displayRecord(filteredSheetData[0].id);
+            displayRecord(filteredSheetData[0].id, true);
         } else {
             prepareNewRecord();
         }
@@ -888,13 +936,13 @@
 
     function populateRecordTable() {
         recordTableBody.innerHTML = '';
+        selectedRowIds.clear();
         if (filteredSheetData.length === 0) {
-            recordTableBody.innerHTML = '<tr><td colspan="6" style="text-align:center;">このファイルに対応するレコードはありません。</td></tr>';
-            approveButton.disabled = true;
+            recordTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">このファイルに対応するレコードはありません。</td></tr>';
+            updateApprovalButtonState();
             return;
         }
 
-        let hasInvalidRow = false;
         const productMasterNames = masterData.product.map(p => p.name);
 
         filteredSheetData.forEach(record => {
@@ -905,38 +953,53 @@
             const isProductInvalid = !productMasterNames.includes(record.product);
             const isUnitInvalid = !masterData.unit.includes(record.unit);
 
-            tr.innerHTML = `
-                <td class="${isClientInvalid ? 'invalid-cell' : ''}">${record.client}</td>
-                <td>${record.deliveryDate}</td>
-                <td class="${isProductInvalid ? 'invalid-cell' : ''}">${record.product}</td>
-                <td>${record.notes}</td>
-                <td>${record.quantity}</td>
-                <td class="${isUnitInvalid ? 'invalid-cell' : ''}">${record.unit}</td>
-            `;
+            tr.innerHTML = createRowHtml(record, isClientInvalid, isProductInvalid, isUnitInvalid);
 
             if (isClientInvalid || isProductInvalid || isUnitInvalid) {
                 tr.classList.add('invalid-row');
                 tr.title = 'マスタデータと不整合があります';
-                hasInvalidRow = true;
             }
 
-            tr.addEventListener('click', () => displayRecord(record.id));
-            tr.addEventListener('dblclick', () => {
-                formWrapper.classList.toggle('open');
+            tr.addEventListener('click', (e) => {
+                if(e.target.type === 'checkbox') return;
+                displayRecord(record.id, true);
             });
+
+            tr.querySelector('.row-checkbox').addEventListener('change', (e) => {
+                const rowId = parseInt(tr.dataset.recordId, 10);
+                if(e.target.checked) {
+                    selectedRowIds.add(rowId);
+                } else {
+                    selectedRowIds.delete(rowId);
+                }
+                updateSelectionUI();
+            });
+
             recordTableBody.appendChild(tr);
         });
 
-        approveButton.disabled = hasInvalidRow;
+        updateSelectionUI();
     }
 
-    function displayRecord(recordId) {
+    function createRowHtml(record, isClientInvalid, isProductInvalid, isUnitInvalid) {
+        return `
+            <td><input type="checkbox" class="row-checkbox"></td>
+            <td class="${isClientInvalid ? 'invalid-cell' : ''}">${record.client}</td>
+            <td>${record.deliveryDate}</td>
+            <td class="${isProductInvalid ? 'invalid-cell' : ''}">${record.product}</td>
+            <td>${record.notes}</td>
+            <td>${record.quantity}</td>
+            <td class="${isUnitInvalid ? 'invalid-cell' : ''}">${record.unit}</td>
+        `;
+    }
+
+    function displayRecord(recordId, clearSelection = false) {
+        if (clearSelection) {
+            selectedRowIds.clear();
+            selectedRowIds.add(recordId);
+        }
         currentRecordId = recordId;
-        const allRows = recordTableBody.querySelectorAll('tr');
-        allRows.forEach(row => row.classList.remove('selected-row'));
-        
-        const selectedRow = recordTableBody.querySelector(`tr[data-record-id="${recordId}"]`);
-        if (selectedRow) selectedRow.classList.add('selected-row');
+        updateSelectionUI();
 
         const record = allSheetData.find(r => r.id == recordId);
         if (!record) return;
@@ -959,24 +1022,59 @@
 
         updateStatus('', '', sheetStatus);
     }
+    
+    function updateSelectionUI() {
+        const allRows = recordTableBody.querySelectorAll('tr');
+        allRows.forEach(row => {
+            const rowId = parseInt(row.dataset.recordId, 10);
+            row.querySelector('.row-checkbox').checked = selectedRowIds.has(rowId);
+            if (selectedRowIds.has(rowId)) {
+                row.classList.add('selected-row');
+            } else {
+                row.classList.remove('selected-row');
+            }
+        });
+
+        const allCheckboxes = recordTableBody.querySelectorAll('.row-checkbox');
+        const allChecked = allCheckboxes.length > 0 && Array.from(allCheckboxes).every(c => c.checked);
+        selectAllCheckbox.checked = allChecked;
+        
+        updateApprovalButtonState();
+    }
+
+    function updateApprovalButtonState() {
+        const hasSelection = selectedRowIds.size > 0;
+        const hasInvalidSelection = Array.from(selectedRowIds).some(id => {
+            const row = recordTableBody.querySelector(`tr[data-record-id="${id}"]`);
+            return row && row.classList.contains('invalid-row');
+        });
+        approveButton.disabled = !hasSelection || hasInvalidSelection;
+    }
+
 
     // --- データ更新関連 ---
 
     function prepareNewRecord() {
+        selectedRowIds.clear();
+        updateSelectionUI();
         currentRecordId = null;
         dataForm.reset();
         masterChoices.client.setChoiceByValue('');
         masterChoices.product.setChoiceByValue('');
         masterChoices.unit.setChoiceByValue('');
-        const allRows = recordTableBody.querySelectorAll('tr');
-        allRows.forEach(row => row.classList.remove('selected-row'));
         updateStatus('新しいレコードを入力できます。', 'success', sheetStatus);
     }
 
     async function saveToSheet() {
+        if (selectedRowIds.size !== 1) {
+            showToast('1行だけ選択して保存してください。', 'error');
+            return;
+        }
+        const recordIdToSave = selectedRowIds.values().next().value;
+        
         saveSheetButton.disabled = true;
         
-        const isNewRecord = currentRecordId === null;
+        const isNewRecord = recordIdToSave === null;
         const actionText = isNewRecord ? '追加' : '更新';
         updateStatus(`スプレッドシートに${actionText}しています...`, '', sheetStatus);
         showLoader();
@@ -985,7 +1083,7 @@
             const sheetId = document.getElementById('sheet-id').value;
             const dataRange = document.getElementById('data-range').value;
             
-            const recordToSave = isNewRecord ? null : allSheetData.find(r => r.id === currentRecordId);
+            const recordToSave = isNewRecord ? null : allSheetData.find(r => r.id === recordIdToSave);
 
             const deliveryDateFromForm = document.getElementById('f-delivery-date').value;
             const deliveryDateForSheet = deliveryDateFromForm ? deliveryDateFromForm.replace(/-/g, '/') : '';
@@ -998,7 +1096,8 @@
                 document.getElementById('f-quantity').value,
                 masterChoices.unit.getValue(true),
                 isNewRecord ? currentFileId : recordToSave.fileId,
-                isNewRecord ? '0' : recordToSave.status
+                isNewRecord ? '0' : recordToSave.status,
+                '1' // 活性フラグ
             ];
 
             if (isNewRecord) {
@@ -1012,7 +1111,7 @@
                 });
             } else {
                 const sheetName = dataRange.split('!')[0];
-                const targetRow = parseInt(currentRecordId, 10) + 2;
+                const targetRow = parseInt(recordIdToSave, 10) + 2;
                 const updateRange = `${sheetName}!A${targetRow}`;
                 await gapi.client.sheets.spreadsheets.values.update({
                     spreadsheetId: sheetId,
@@ -1036,39 +1135,23 @@
         }
     }
 
-    async function deleteSheetRow() {
-        if (currentRecordId === null) return;
+    async function deactivateSheetRow() {
+        if (selectedRowIds.size === 0) return;
         
         confirmModal.classList.add('hidden');
-        updateStatus('行を削除しています...', '', sheetStatus);
+        updateStatus('行を削除（非活性化）しています...', '', sheetStatus);
         showLoader();
         
         try {
-            const sheetId = document.getElementById('sheet-id').value;
-            const targetRowIndex = parseInt(currentRecordId, 10) + 1;
-
-            await gapi.client.sheets.spreadsheets.batchUpdate({
-                spreadsheetId: sheetId,
-                resource: {
-                    requests: [{
-                        deleteDimension: {
-                            range: {
-                                sheetId: sheetGid,
-                                dimension: "ROWS",
-                                startIndex: targetRowIndex,
-                                endIndex: targetRowIndex + 1
-                            }
-                        }
-                    }]
-                }
-            });
+            const recordsToDeactivate = Array.from(selectedRowIds).map(id => allSheetData.find(r => r.id === id));
+            await updateActiveFlagsInSheet(recordsToDeactivate, '0');
             
             await loadSheetData();
             handleImageFileSelection({ detail: { value: currentFileId } });
-            updateStatus('行を削除しました。', 'success', sheetStatus);
+            updateStatus('選択した行を削除（非活性化）しました。', 'success', sheetStatus);
 
         } catch (error) {
-            console.error('Google Sheet delete error:', error);
+            console.error('Google Sheet deactivate error:', error);
             const errorMessage = error.result?.error?.message || '不明なエラーが発生しました。';
             updateStatus(`削除失敗: ${errorMessage}`, 'error', sheetStatus);
         } finally {
@@ -1076,27 +1159,80 @@
         }
     }
 
+    async function deactivateFileRecords() {
+        if (!currentFileId) return;
+
+        confirmModal.classList.add('hidden');
+        updateStatus('ファイルを削除（非活性化）しています...', '', sheetStatus);
+        showLoader();
+        
+        try {
+            const recordsToDeactivate = allSheetData.filter(r => r.fileId === currentFileId);
+            await updateActiveFlagsInSheet(recordsToDeactivate, '0');
+            
+            await loadAllData();
+            updateStatus('ファイルを削除（非活性化）しました。', 'success', sheetStatus);
+        } catch (error) {
+            console.error('Google Sheet deactivate file error:', error);
+            const errorMessage = error.result?.error?.message || '不明なエラーが発生しました。';
+            updateStatus(`ファイル削除失敗: ${errorMessage}`, 'error', sheetStatus);
+        } finally {
+            hideLoader();
+        }
+    }
+
+    async function updateActiveFlagsInSheet(records, newFlag) {
+        const sheetId = document.getElementById('sheet-id').value;
+        const sheetName = document.getElementById('data-range').value.split('!')[0];
+        const activeFlagColumnLetter = String.fromCharCode('A'.charCodeAt(0) + ACTIVE_FLAG_COL_INDEX);
+
+        const data = records.map(record => {
+            const targetRow = record.id + 2;
+            return {
+                range: `${sheetName}!${activeFlagColumnLetter}${targetRow}`,
+                values: [[newFlag]]
+            };
+        });
+
+        await gapi.client.sheets.spreadsheets.values.batchUpdate({
+            spreadsheetId: sheetId,
+            resource: {
+                valueInputOption: 'RAW',
+                data: data
+            }
+        });
+    }
+
     // --- 承認・kintone連携フロー ---
     
     function showConfirmModal(action) {
         if (action === 'delete') {
-            if (currentRecordId === null) {
+            if (selectedRowIds.size === 0) {
                 updateStatus('削除する行が選択されていません。', 'error', sheetStatus);
                 return;
             }
             modalTitle.textContent = '削除の確認';
-            modalMessage.textContent = 'このレコードを本当に削除しますか？この操作は元に戻せません。';
+            modalMessage.textContent = `${selectedRowIds.size}件のレコードを本当に削除しますか？`;
             confirmActionButton.textContent = 'はい、削除します';
-            confirmActionButton.onclick = deleteSheetRow;
+            confirmActionButton.onclick = deactivateSheetRow;
         } else if (action === 'approve') {
-             if (!currentFileId) {
-                updateStatus('承認する発注書が選択されていません。', 'error', sheetStatus);
+             if (selectedRowIds.size === 0) {
+                updateStatus('承認する行が選択されていません。', 'error', sheetStatus);
                 return;
             }
             modalTitle.textContent = '承認の確認';
-            modalMessage.textContent = 'この発注書を承認し、kintoneに連携しますか？';
+            modalMessage.textContent = `${selectedRowIds.size}件のレコードを承認し、kintoneに連携しますか？`;
             confirmActionButton.textContent = 'はい、承認します';
             confirmActionButton.onclick = handleApproval;
+        } else if (action === 'deleteFile') {
+            if (!currentFileId) {
+                updateStatus('削除するファイルが選択されていません。', 'error', sheetStatus);
+                return;
+            }
+            modalTitle.textContent = 'ファイル削除の確認';
+            modalMessage.textContent = `このファイルに紐づく全てのレコードを削除（非表示に）しますか？`;
+            confirmActionButton.textContent = 'はい、削除します';
+            confirmActionButton.onclick = deactivateFileRecords;
         }
         confirmModal.classList.remove('hidden');
     }
@@ -1105,7 +1241,7 @@
         confirmModal.classList.add('hidden');
         showLoader();
         
-        const recordsToProcess = allSheetData.filter(r => r.fileId === currentFileId);
+        const recordsToProcess = Array.from(selectedRowIds).map(id => allSheetData.find(r => r.id === id));
         if (recordsToProcess.length === 0) {
             updateStatus('承認対象のレコードがありません。', 'error', sheetStatus);
             hideLoader();
