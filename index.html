@@ -231,7 +231,6 @@
             border-bottom: 1px solid var(--border-color);
             white-space: nowrap;
         }
-        /* ★修正: チェックボックスセルのスタイル */
         .record-table th:first-child, .record-table td:first-child {
             width: 40px;
             text-align: center;
@@ -245,6 +244,7 @@
         .record-table tbody tr {
             cursor: pointer;
             transition: background-color 0.2s;
+            user-select: none;
         }
         .record-table tbody tr:nth-child(even) {
             background-color: #f8f9fa;
@@ -536,7 +536,6 @@
                 <table class="record-table">
                     <thead>
                         <tr>
-                            <!-- ★修正: ヘッダーにチェックボックスを追加 -->
                             <th><input type="checkbox" id="select-all-checkbox" title="すべて選択/解除"></th>
                             <th>取引先名</th>
                             <th>納品日付</th>
@@ -676,7 +675,7 @@
     let masterChoices = {};
     let currentRecordId = null;
     let currentFileId = null;
-    let masterData = { client: [], product: [], unit: [] };
+    let masterData = { client: [], product: [], unit: [], prices: [] };
     let sheetGid = null;
     let imageFileChoices;
     let selectedRowIds = new Set();
@@ -847,6 +846,7 @@
         masterData.client = result.data.customers;
         masterData.product = result.data.products; // {name, number} の配列
         masterData.unit = result.data.units;
+        masterData.prices = result.data.prices;
 
         masterChoices.client.setChoices(masterData.client.map(c => ({ value: c, label: c })), 'value', 'label', true);
         masterChoices.product.setChoices(masterData.product.map(p => ({ value: p.name, label: p.name })), 'value', 'label', true);
@@ -1298,6 +1298,15 @@
             }
             const productInfo = masterData.product.find(p => p.name === r.product);
             kintoneRecord.productNumber = productInfo ? productInfo.number : null;
+            
+            const priceInfo = masterData.prices.find(p =>
+                p.customer === r.client &&
+                p.product === r.product &&
+                p.isBase
+            );
+            kintoneRecord.priceId = priceInfo ? priceInfo.priceId : null;
+            kintoneRecord.price = priceInfo ? priceInfo.price : null;
+
             return kintoneRecord;
         });
 
