@@ -531,33 +531,6 @@
                 transform: translateY(20px);
             }
         }
-        
-        /* --- 一括修正用スタイル --- */
-        .form-label-wrapper {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 8px;
-        }
-        .form-label-wrapper label {
-            margin-bottom: 0;
-        }
-        
-        .bulk-edit-toggle {
-            display: none; /* デフォルトでは非表示 */
-        }
-        
-        .form-wrapper.bulk-edit-mode .bulk-edit-toggle {
-            display: inline-block; /* 一括編集中に表示 */
-        }
-
-        .form-wrapper.bulk-edit-mode .input-group:not(.bulk-editable) input,
-        .form-wrapper.bulk-edit-mode .input-group:not(.bulk-editable) .choices__inner {
-             background-color: #f0f0f0;
-             pointer-events: none;
-        }
-
-
     </style>
 </head>
 
@@ -671,43 +644,27 @@
                     <h3 class="form-title">修正フォーム</h3>
                     <form id="data-form">
                         <div class="input-group">
-                             <div class="form-label-wrapper">
-                                <label for="f-client">取引先名</label>
-                            </div>
+                            <label for="f-client">取引先名</label>
                             <select id="f-client" placeholder="取引先を検索または選択"></select>
                         </div>
-                         <div class="input-group bulk-editable">
-                            <div class="form-label-wrapper">
-                                <label for="f-delivery-date">納品日付</label>
-                                <input type="checkbox" class="bulk-edit-toggle" data-target="f-delivery-date" title="この項目を一括更新する">
-                            </div>
+                        <div class="input-group">
+                            <label for="f-delivery-date">納品日付</label>
                             <input type="date" id="f-delivery-date">
                         </div>
                         <div class="input-group">
-                            <div class="form-label-wrapper">
-                                <label for="f-product">商品名</label>
-                            </div>
+                            <label for="f-product">商品名</label>
                             <select id="f-product" placeholder="商品を検索または選択"></select>
                         </div>
-                        <div class="input-group bulk-editable">
-                            <div class="form-label-wrapper">
-                                <label for="f-quantity">数量</label>
-                                <input type="checkbox" class="bulk-edit-toggle" data-target="f-quantity" title="この項目を一括更新する">
-                            </div>
+                        <div class="input-group">
+                            <label for="f-quantity">数量</label>
                             <input type="number" id="f-quantity" step="any">
                         </div>
-                        <div class="input-group bulk-editable">
-                            <div class="form-label-wrapper">
-                                <label for="f-unit">単位</label>
-                                <input type="checkbox" class="bulk-edit-toggle" data-target="f-unit" title="この項目を一括更新する">
-                            </div>
+                        <div class="input-group">
+                            <label for="f-unit">単位</label>
                             <select id="f-unit" placeholder="単位を検索または選択"></select>
                         </div>
-                        <div class="input-group bulk-editable">
-                             <div class="form-label-wrapper">
-                                <label for="f-notes">加工方法・備考</label>
-                                <input type="checkbox" class="bulk-edit-toggle" data-target="f-notes" title="この項目を一括更新する">
-                            </div>
+                        <div class="input-group">
+                            <label for="f-notes">加工方法・備考</label>
                             <input type="text" id="f-notes">
                         </div>
                         <div class="form-footer">
@@ -812,7 +769,6 @@
         const topPane = document.querySelector('.top-pane');
         const deleteFileButton = document.getElementById('delete-file-button');
         const selectAllCheckbox = document.getElementById('select-all-checkbox');
-        const formTitle = document.querySelector('.form-title');
 
         let gapiInited = false;
         let gsiInited = false;
@@ -858,6 +814,9 @@
         });
         topPane.addEventListener('click', (event) => {
             if (formWrapper.classList.contains('open')) {
+                // HACK: フォーム自体や、フォームを開くトリガーとなったテーブル以外をクリックした場合にフォームを閉じる
+                // Choices.jsのドロップダウンをクリックした際にも閉じてしまうため、より丁寧な判定が必要だが、
+                // 一旦テーブルコンテナ以外をクリックしたら閉じる、という簡易的な実装にする
                 if (!event.target.closest('.record-table-container') && !event.target.closest('.form-wrapper')) {
                     formWrapper.classList.remove('open');
                 }
@@ -876,23 +835,6 @@
                 }
             });
             updateSelectionUI();
-        });
-
-        dataForm.addEventListener('change', (e) => {
-            if (e.target.classList.contains('bulk-edit-toggle')) {
-                const targetId = e.target.dataset.target;
-                const targetInput = document.getElementById(targetId);
-                if (targetInput) {
-                    const choice = masterChoices[targetId.replace('f-','')]
-                    if (e.target.checked) {
-                        targetInput.disabled = false;
-                        if(choice) choice.enable();
-                    } else {
-                        targetInput.disabled = true;
-                        if(choice) choice.disable();
-                    }
-                }
-            }
         });
 
 
@@ -1104,6 +1046,7 @@
 
         function populateRecordTable() {
             recordTableBody.innerHTML = '';
+            // selectedRowIds.clear(); // テーブル再描画時に選択をクリアしない
             if (filteredSheetData.length === 0) {
                 recordTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">このファイルに対応するレコードはありません。</td></tr>';
                 updateApprovalButtonState();
@@ -1129,6 +1072,7 @@
 
                 tr.addEventListener('click', (e) => {
                     if (e.target.type === 'checkbox') return;
+                    // ★修正点1: 行クリックでフォームを開く
                     formWrapper.classList.add('open');
                     displayRecord(record.id, true);
                 });
@@ -1160,67 +1104,8 @@
             <td class="${isUnitInvalid ? 'invalid-cell' : ''}">${record.unit}</td>
         `;
         }
-        
-        function updateFormState() {
-            const selectionSize = selectedRowIds.size;
-            
-            if (selectionSize > 1) {
-                formWrapper.classList.add('bulk-edit-mode');
-                formTitle.textContent = `${selectionSize}件を一括修正`;
-                displayBulkEditForm();
-                currentRecordId = null;
-            } else if (selectionSize === 1) {
-                formWrapper.classList.remove('bulk-edit-mode');
-                formTitle.textContent = '修正フォーム';
-                 const singleId = selectedRowIds.values().next().value;
-                displayRecord(singleId, false); // Don't clear selection
-            } else {
-                formWrapper.classList.remove('bulk-edit-mode');
-                formTitle.textContent = '修正フォーム';
-                prepareNewRecord(false); // Don't re-clear selection
-            }
-        }
-        
-        function displayBulkEditForm() {
-            const selectedRecords = Array.from(selectedRowIds).map(id => allSheetData.find(r => r.id === id));
-            dataForm.reset();
 
-            ['f-client', 'f-product'].forEach(id => {
-                document.getElementById(id).closest('.choices').parentElement.style.backgroundColor = '#f0f0f0';
-            });
-            masterChoices.client.disable();
-            masterChoices.product.disable();
-
-            // Check for common values
-            const commonValues = {};
-            const editableFields = ['deliveryDate', 'quantity', 'unit', 'notes'];
-            editableFields.forEach(field => {
-                const values = new Set(selectedRecords.map(r => r[field]));
-                if(values.size === 1) {
-                    commonValues[field] = values.values().next().value;
-                }
-            });
-
-            // Set form values
-            document.getElementById('f-delivery-date').value = commonValues.deliveryDate ? formatDateForInput(commonValues.deliveryDate) : '';
-            document.getElementById('f-quantity').value = commonValues.quantity || '';
-            masterChoices.unit.setChoiceByValue(String(commonValues.unit || ''));
-            document.getElementById('f-notes').value = commonValues.notes || '';
-            
-             // Reset bulk edit toggles and disable inputs
-            document.querySelectorAll('.bulk-edit-toggle').forEach(toggle => {
-                toggle.checked = false;
-                const targetInput = document.getElementById(toggle.dataset.target);
-                targetInput.disabled = true;
-                const choice = masterChoices[toggle.dataset.target.replace('f-','')];
-                if(choice) choice.disable();
-            });
-
-            updateStatus('一括更新する項目にチェックを入れてください。', 'success', sheetStatus);
-        }
-
-
-        function displayRecord(recordId, clearSelection = true) {
+        function displayRecord(recordId, clearSelection = false) {
             if (clearSelection) {
                 selectedRowIds.clear();
                 selectedRowIds.add(recordId);
@@ -1231,6 +1116,7 @@
             const record = allSheetData.find(r => r.id == recordId);
             if (!record) return;
 
+            // ★修正点2: マスタにない値は選択肢に追加せず、単純にセットを試みる
             masterChoices.client.setChoiceByValue(String(record.client || ''));
             masterChoices.product.setChoiceByValue(String(record.product || ''));
             masterChoices.unit.setChoiceByValue(String(record.unit || ''));
@@ -1238,10 +1124,6 @@
             document.getElementById('f-delivery-date').value = formatDateForInput(record.deliveryDate);
             document.getElementById('f-notes').value = record.notes;
             document.getElementById('f-quantity').value = record.quantity;
-            
-             // Ensure all inputs are enabled for single-edit mode
-            dataForm.querySelectorAll('input, select').forEach(el => el.disabled = false);
-            Object.values(masterChoices).forEach(c => c.enable());
 
             updateStatus('', '', sheetStatus);
         }
@@ -1266,7 +1148,6 @@
             selectAllCheckbox.checked = allChecked;
 
             updateApprovalButtonState();
-            updateFormState(); // Call this to update the form based on selection
         }
 
         function updateApprovalButtonState() {
@@ -1281,104 +1162,30 @@
 
         // --- データ更新関連 ---
 
-        function prepareNewRecord(clearSelection = true) {
-             if (clearSelection) {
-                selectedRowIds.clear();
-                updateSelectionUI();
-             }
+        function prepareNewRecord() {
+            selectedRowIds.clear();
+            updateSelectionUI();
             currentRecordId = null;
             dataForm.reset();
             masterChoices.client.setChoiceByValue('');
             masterChoices.product.setChoiceByValue('');
             masterChoices.unit.setChoiceByValue('');
-             // Ensure all inputs are enabled for new record mode
-            dataForm.querySelectorAll('input, select').forEach(el => el.disabled = false);
-            Object.values(masterChoices).forEach(c => c.enable());
             updateStatus('新しいレコードを入力できます。', 'success', sheetStatus);
             formWrapper.classList.add('open');
         }
-        
-        async function saveBulkChangesToSheet() {
-            const toggles = document.querySelectorAll('.bulk-edit-toggle:checked');
-            if(toggles.length === 0) {
-                showToast('一括更新する項目を1つ以上選択してください。', 'error');
-                return;
-            }
-            
-            updateStatus(`${selectedRowIds.size}件のレコードを一括更新しています...`, '', sheetStatus);
-            showLoader();
-            saveSheetButton.disabled = true;
-
-            try {
-                const sheetId = document.getElementById('sheet-id').value;
-                const sheetName = document.getElementById('data-range').value.split('!')[0];
-                
-                const data = Array.from(selectedRowIds).map(id => {
-                    const originalRecord = allSheetData.find(r => r.id === id);
-                    const newValues = [
-                        originalRecord.client, originalRecord.deliveryDate, originalRecord.product,
-                        originalRecord.notes, originalRecord.quantity, originalRecord.unit,
-                        originalRecord.fileId, originalRecord.status, originalRecord.active
-                    ];
-
-                    toggles.forEach(toggle => {
-                        const targetId = toggle.dataset.target;
-                        switch(targetId) {
-                            case 'f-delivery-date':
-                                newValues[1] = document.getElementById(targetId).value.replace(/-/g, '/');
-                                break;
-                            case 'f-notes':
-                                newValues[3] = document.getElementById(targetId).value;
-                                break;
-                             case 'f-quantity':
-                                newValues[4] = document.getElementById(targetId).value;
-                                break;
-                            case 'f-unit':
-                                newValues[5] = masterChoices.unit.getValue(true);
-                                break;
-                        }
-                    });
-
-                    const targetRow = id + 2;
-                    return {
-                        range: `${sheetName}!A${targetRow}`,
-                        values: [newValues]
-                    };
-                });
-                
-                await gapi.client.sheets.spreadsheets.values.batchUpdate({
-                    spreadsheetId: sheetId,
-                    resource: {
-                        valueInputOption: 'USER_ENTERED',
-                        data: data
-                    }
-                });
-
-                await loadSheetData();
-                filteredSheetData = allSheetData.filter(record => record.fileId === currentFileId);
-                populateRecordTable();
-                updateStatus(`${selectedRowIds.size}件のレコードを更新しました。`, 'success', sheetStatus);
-                
-            } catch (error) {
-                 console.error('Bulk update error:', error);
-                const errorMessage = error.result?.error?.message || '不明なエラーが発生しました。';
-                updateStatus(`一括更新失敗: ${errorMessage}`, 'error', sheetStatus);
-            } finally {
-                saveSheetButton.disabled = false;
-                hideLoader();
-            }
-        }
-
 
         async function saveToSheet() {
-            if (selectedRowIds.size > 1) {
-                await saveBulkChangesToSheet();
+            let recordIdToSave;
+            if (currentRecordId !== null) {
+                recordIdToSave = currentRecordId;
+            } else if (selectedRowIds.size === 1) {
+                recordIdToSave = selectedRowIds.values().next().value;
+            } else if (selectedRowIds.size === 0) {
+                // 新規追加の場合
+                recordIdToSave = null;
+            } else {
+                showToast('保存対象は1行にしてください（新規の場合は行選択は不要です）。', 'error');
                 return;
-            }
-            
-            let recordIdToSave = currentRecordId;
-            if (selectedRowIds.size === 1) {
-                 recordIdToSave = selectedRowIds.values().next().value;
             }
 
             saveSheetButton.disabled = true;
@@ -1413,13 +1220,14 @@
 
                 if (isNewRecord) {
                     if (!currentFileId) throw new Error("画像ファイルが選択されていません。");
-                    await gapi.client.sheets.spreadsheets.values.append({
+                    const appendResponse = await gapi.client.sheets.spreadsheets.values.append({
                         spreadsheetId: sheetId,
                         range: dataRange,
                         valueInputOption: 'USER_ENTERED',
                         insertDataOption: 'INSERT_ROWS',
                         resource: { values: [values] }
                     });
+                    // 新規追加した場合、最後の行がそれにあたるので、再読み込み後のallSheetDataからIDを取得する
                 } else {
                     const sheetName = dataRange.split('!')[0];
                     const targetRow = parseInt(recordIdToSave, 10) + 2;
@@ -1432,21 +1240,22 @@
                     });
                     savedRecordIndex = recordIdToSave;
                 }
-                
+
+                // ★修正点3 & 4: 必要なデータだけを再読み込み・再描画し、選択状態を復元
                 await loadSheetData();
                 filteredSheetData = allSheetData.filter(record => record.fileId === currentFileId);
-                
+                populateRecordTable();
+
                 if (isNewRecord) {
-                    populateRecordTable();
+                    // 新規追加した場合、新しく作られたレコードを選択状態にする
+                    // 最もIDが大きいものが新規追加されたものと仮定
                     const newRecord = filteredSheetData.reduce((prev, current) => (prev.id > current.id) ? prev : current);
                     if (newRecord) {
-                         displayRecord(newRecord.id, true);
+                        displayRecord(newRecord.id, true);
                     }
+                    prepareNewRecord(); // フォームはクリア
                 } else if (savedRecordIndex !== undefined) {
-                    selectedRowIds.clear();
-                    selectedRowIds.add(savedRecordIndex);
-                    populateRecordTable();
-                    displayRecord(savedRecordIndex, false);
+                    displayRecord(savedRecordIndex, true);
                 }
 
                 updateStatus(`シートの${actionText}に成功しました。`, 'success', sheetStatus);
@@ -1719,4 +1528,3 @@
 </body>
 
 </html>
-
