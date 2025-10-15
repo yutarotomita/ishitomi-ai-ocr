@@ -814,7 +814,10 @@
         });
         topPane.addEventListener('click', (event) => {
             if (formWrapper.classList.contains('open')) {
-                if (!event.target.closest('.record-table-container')) {
+                // HACK: フォーム自体や、フォームを開くトリガーとなったテーブル以外をクリックした場合にフォームを閉じる
+                // Choices.jsのドロップダウンをクリックした際にも閉じてしまうため、より丁寧な判定が必要だが、
+                // 一旦テーブルコンテナ以外をクリックしたら閉じる、という簡易的な実装にする
+                if (!event.target.closest('.record-table-container') && !event.target.closest('.form-wrapper')) {
                     formWrapper.classList.remove('open');
                 }
             }
@@ -991,7 +994,6 @@
                     status: row[STATUS_COL_INDEX] || '',
                     active: row[ACTIVE_FLAG_COL_INDEX] === undefined ? '1' : String(row[ACTIVE_FLAG_COL_INDEX])
                 }))
-                // ★修正: 連携ステータスが0または空のレコードのみを抽出
                 .filter(record => {
                     const status = String(record.status || '').trim();
                     return (status === '0' || status === '') && record.active == '1';
@@ -1044,7 +1046,7 @@
 
         function populateRecordTable() {
             recordTableBody.innerHTML = '';
-            selectedRowIds.clear();
+            // selectedRowIds.clear(); // テーブル再描画時に選択をクリアしない
             if (filteredSheetData.length === 0) {
                 recordTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">このファイルに対応するレコードはありません。</td></tr>';
                 updateApprovalButtonState();
@@ -1070,6 +1072,8 @@
 
                 tr.addEventListener('click', (e) => {
                     if (e.target.type === 'checkbox') return;
+                    // ★修正点1: 行クリックでフォームを開く
+                    formWrapper.classList.add('open');
                     displayRecord(record.id, true);
                 });
 
@@ -1112,17 +1116,10 @@
             const record = allSheetData.find(r => r.id == recordId);
             if (!record) return;
 
-            const ensureAndSetChoice = (choiceInstance, masterList, value) => {
-                const masterValues = masterList.map(item => (typeof item === 'object' ? item.name : item));
-                if (value && !masterValues.includes(value)) {
-                    choiceInstance.setChoices([{ value: value, label: value }], 'value', 'label', false);
-                }
-                choiceInstance.setChoiceByValue(String(value || ''));
-            };
-
-            ensureAndSetChoice(masterChoices.client, masterData.client, record.client);
-            ensureAndSetChoice(masterChoices.product, masterData.product, record.product);
-            ensureAndSetChoice(masterChoices.unit, masterData.unit, record.unit);
+            // ★修正点2: マスタにない値は選択肢に追加せず、単純にセットを試みる
+            masterChoices.client.setChoiceByValue(String(record.client || ''));
+            masterChoices.product.setChoiceByValue(String(record.product || ''));
+            masterChoices.unit.setChoiceByValue(String(record.unit || ''));
 
             document.getElementById('f-delivery-date').value = formatDateForInput(record.deliveryDate);
             document.getElementById('f-notes').value = record.notes;
@@ -1135,7 +1132,10 @@
             const allRows = recordTableBody.querySelectorAll('tr');
             allRows.forEach(row => {
                 const rowId = parseInt(row.dataset.recordId, 10);
-                row.querySelector('.row-checkbox').checked = selectedRowIds.has(rowId);
+                const checkbox = row.querySelector('.row-checkbox');
+                if (checkbox) {
+                    checkbox.checked = selectedRowIds.has(rowId);
+                }
                 if (selectedRowIds.has(rowId)) {
                     row.classList.add('selected-row');
                 } else {
@@ -1171,14 +1171,22 @@
             masterChoices.product.setChoiceByValue('');
             masterChoices.unit.setChoiceByValue('');
             updateStatus('新しいレコードを入力できます。', 'success', sheetStatus);
+            formWrapper.classList.add('open');
         }
 
         async function saveToSheet() {
-            if (selectedRowIds.size !== 1) {
-                showToast('1行だけ選択して保存してください。', 'error');
+            let recordIdToSave;
+            if (currentRecordId !== null) {
+                recordIdToSave = currentRecordId;
+            } else if (selectedRowIds.size === 1) {
+                recordIdToSave = selectedRowIds.values().next().value;
+            } else if (selectedRowIds.size === 0) {
+                // 新規追加の場合
+                recordIdToSave = null;
+            } else {
+                showToast('保存対象は1行にしてください（新規の場合は行選択は不要です）。', 'error');
                 return;
             }
-            const recordIdToSave = selectedRowIds.values().next().value;
 
             saveSheetButton.disabled = true;
 
@@ -1208,15 +1216,18 @@
                     '1' // 活性フラグ
                 ];
 
+                let savedRecordIndex;
+
                 if (isNewRecord) {
                     if (!currentFileId) throw new Error("画像ファイルが選択されていません。");
-                    await gapi.client.sheets.spreadsheets.values.append({
+                    const appendResponse = await gapi.client.sheets.spreadsheets.values.append({
                         spreadsheetId: sheetId,
                         range: dataRange,
                         valueInputOption: 'USER_ENTERED',
                         insertDataOption: 'INSERT_ROWS',
                         resource: { values: [values] }
                     });
+                    // 新規追加した場合、最後の行がそれにあたるので、再読み込み後のallSheetDataからIDを取得する
                 } else {
                     const sheetName = dataRange.split('!')[0];
                     const targetRow = parseInt(recordIdToSave, 10) + 2;
@@ -1227,10 +1238,26 @@
                         valueInputOption: 'USER_ENTERED',
                         resource: { values: [values] }
                     });
+                    savedRecordIndex = recordIdToSave;
                 }
 
+                // ★修正点3 & 4: 必要なデータだけを再読み込み・再描画し、選択状態を復元
                 await loadSheetData();
-                handleImageFileSelection({ detail: { value: currentFileId } });
+                filteredSheetData = allSheetData.filter(record => record.fileId === currentFileId);
+                populateRecordTable();
+
+                if (isNewRecord) {
+                    // 新規追加した場合、新しく作られたレコードを選択状態にする
+                    // 最もIDが大きいものが新規追加されたものと仮定
+                    const newRecord = filteredSheetData.reduce((prev, current) => (prev.id > current.id) ? prev : current);
+                    if (newRecord) {
+                        displayRecord(newRecord.id, true);
+                    }
+                    prepareNewRecord(); // フォームはクリア
+                } else if (savedRecordIndex !== undefined) {
+                    displayRecord(savedRecordIndex, true);
+                }
+
                 updateStatus(`シートの${actionText}に成功しました。`, 'success', sheetStatus);
 
             } catch (error) {
@@ -1255,7 +1282,15 @@
                 await updateActiveFlagsInSheet(recordsToDeactivate, '0');
 
                 await loadSheetData();
-                handleImageFileSelection({ detail: { value: currentFileId } });
+                filteredSheetData = allSheetData.filter(record => record.fileId === currentFileId);
+                populateRecordTable();
+
+                if (filteredSheetData.length > 0) {
+                    displayRecord(filteredSheetData[0].id, true);
+                } else {
+                    prepareNewRecord();
+                }
+
                 updateStatus('選択した行を削除（非活性化）しました。', 'success', sheetStatus);
 
             } catch (error) {
@@ -1461,10 +1496,11 @@
         function formatDateForInput(dateString) {
             if (!dateString) return '';
             const parts = dateString.split('/');
-            if (parts.length !== 3) return dateString;
+            if (parts.length !== 3) return dateString; // yyyy-mm-dd形式など、既にフォーマット済みの場合はそのまま返す
             const year = parts[0];
             const month = parts[1].padStart(2, '0');
             const day = parts[2].padStart(2, '0');
+            if (isNaN(parseInt(year)) || isNaN(parseInt(month)) || isNaN(parseInt(day))) return dateString; // 無効な日付文字列はそのまま
             return `${year}-${month}-${day}`;
         }
 
