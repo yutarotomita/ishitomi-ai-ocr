@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>イシトミAI-OCR</title>
-    <!-- モダンなUIを実現するためのCSSライブラリ (Choices.js) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
     <style>
         /* 全体のデザインテーマ設定 */
@@ -22,11 +21,11 @@
             --highlight-color: #dbe9f6;
             --invalid-row-bg: #fff0f1;
             --invalid-row-text: #d9534f;
+            --duplicate-color: #9b59b6; /* 追加: 複製ボタンの色 */
             --font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
         }
 
-        html,
-        body {
+        html, body {
             height: 100%;
             overflow: hidden;
             font-family: var(--font-family);
@@ -72,9 +71,7 @@
         }
 
 
-        h1,
-        h2,
-        h3 {
+        h1, h2, h3 {
             color: var(--primary-color);
             border-bottom: 3px solid var(--primary-color);
             padding-bottom: 15px;
@@ -82,8 +79,7 @@
             margin-bottom: 25px;
         }
 
-        .config-section h3,
-        .config-section h4 {
+        .config-section h3, .config-section h4 {
             color: var(--text-color);
             border-left: 4px solid var(--primary-color);
             padding-left: 16px;
@@ -99,21 +95,10 @@
             padding-left: 0;
         }
 
-
         /* 入力フォームのスタイル */
-        .input-group {
-            margin-bottom: 20px;
-        }
-
-        .input-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-        }
-
-        .input-group input,
-        .input-group textarea,
-        .choices__inner {
+        .input-group { margin-bottom: 20px; }
+        .input-group label { display: block; margin-bottom: 8px; font-weight: bold; }
+        .input-group input, .input-group textarea, .choices__inner {
             width: 100%;
             padding: 12px;
             border: 1px solid var(--border-color);
@@ -124,16 +109,13 @@
             font-size: 1em;
         }
 
-        .input-group input:focus,
-        .input-group textarea:focus {
+        .input-group input:focus, .input-group textarea:focus {
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
         }
 
-        .choices__inner {
-            padding: 8px;
-        }
+        .choices__inner { padding: 8px; }
 
         /* ボタンのスタイル */
         button {
@@ -164,22 +146,11 @@
             box-shadow: none;
         }
 
-        button .icon {
-            width: 20px;
-            height: 20px;
-        }
-
-        #save-sheet-button {
-            background-color: var(--success-color);
-        }
-
-        #delete-button {
-            background-color: var(--danger-color);
-        }
-
-        #approve-button {
-            background-color: var(--approval-color);
-        }
+        button .icon { width: 20px; height: 20px; }
+        #save-sheet-button { background-color: var(--success-color); }
+        #delete-button { background-color: var(--danger-color); }
+        #approve-button { background-color: var(--approval-color); }
+        #duplicate-button { background-color: var(--duplicate-color); }
 
         /* --- 新レイアウト用スタイル --- */
         .header-pane {
@@ -253,16 +224,14 @@
             border-collapse: collapse;
         }
 
-        .record-table th,
-        .record-table td {
+        .record-table th, .record-table td {
             padding: 12px 15px;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
             white-space: nowrap;
         }
 
-        .record-table th:first-child,
-        .record-table td:first-child {
+        .record-table th:first-child, .record-table td:first-child {
             width: 40px;
             text-align: center;
         }
@@ -280,59 +249,29 @@
             user-select: none;
         }
 
-        .record-table tbody tr:nth-child(even) {
-            background-color: #f8f9fa;
-        }
-
-        .record-table tbody tr:hover {
-            background-color: #e9ecef;
-        }
-
-        .record-table tbody tr.selected-row {
-            background-color: var(--highlight-color);
-        }
-
-        .record-table tbody tr.invalid-row {
-            background-color: var(--invalid-row-bg) !important;
-        }
-
-        .record-table tbody tr.invalid-row:hover {
-            background-color: #fdd !important;
-        }
-
-        .record-table tbody td.invalid-cell {
-            color: var(--invalid-row-text);
-            font-weight: bold;
-        }
-
-        .record-table tbody tr.invalid-row td {
-            color: var(--text-color);
-        }
-
-        .record-table tbody tr.invalid-row td.invalid-cell {
-            color: var(--invalid-row-text);
-        }
+        .record-table tbody tr:nth-child(even) { background-color: #f8f9fa; }
+        .record-table tbody tr:hover { background-color: #e9ecef; }
+        .record-table tbody tr.selected-row { background-color: var(--highlight-color); }
+        .record-table tbody tr.invalid-row { background-color: var(--invalid-row-bg) !important; }
+        .record-table tbody tr.invalid-row:hover { background-color: #fdd !important; }
+        .record-table tbody td.invalid-cell { color: var(--invalid-row-text); font-weight: bold; }
+        .record-table tbody tr.invalid-row td { color: var(--text-color); }
+        .record-table tbody tr.invalid-row td.invalid-cell { color: var(--invalid-row-text); }
 
         .form-wrapper {
             position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
+            bottom: 0; left: 0; right: 0;
             z-index: 20;
             transition: transform 0.4s ease-in-out;
             transform: translateY(calc(100% - 16px));
         }
 
-        .form-wrapper.open {
-            transform: translateY(0);
-        }
+        .form-wrapper.open { transform: translateY(0); }
 
         .form-toggle-header {
             position: absolute;
-            top: -16px;
-            right: 30px;
-            width: 120px;
-            height: 16px;
+            top: -16px; right: 30px;
+            width: 120px; height: 16px;
             background: var(--bg-color);
             border: 1px solid var(--border-color);
             border-bottom: none;
@@ -349,9 +288,7 @@
             transform: rotate(180deg);
         }
 
-        .form-wrapper.open .form-toggle-header .toggle-icon {
-            transform: rotate(0deg);
-        }
+        .form-wrapper.open .form-toggle-header .toggle-icon { transform: rotate(0deg); }
 
         .form-pane {
             background-color: var(--bg-color);
@@ -363,9 +300,7 @@
         .form-title {
             color: var(--text-color);
             border: none;
-            padding: 0;
-            margin-top: 0;
-            margin-bottom: 25px;
+            padding: 0; margin-top: 0; margin-bottom: 25px;
             font-size: 1.2em;
         }
 
@@ -375,28 +310,19 @@
             gap: 20px;
         }
 
-        .form-group-full-width {
-            grid-column: 1 / -1;
-        }
-
+        .form-group-full-width { grid-column: 1 / -1; }
         .form-footer {
             grid-column: 1 / -1;
             display: flex;
             align-items: center;
             gap: 20px;
+            flex-wrap: wrap; /* ボタンが多いのではみ出さないように */
         }
 
-        .main-actions {
-            display: flex;
-            gap: 10px;
-        }
+        .main-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .status-messages { flex-grow: 1; }
 
-        .status-messages {
-            flex-grow: 1;
-        }
-
-        #status-message,
-        #sheet-status {
+        #status-message, #sheet-status {
             padding: 10px 15px;
             border-radius: 6px;
             text-align: left;
@@ -406,131 +332,53 @@
             gap: 10px;
         }
 
-        #sheet-status {
-            margin-top: 0;
-            margin-bottom: 10px;
-        }
+        #sheet-status { margin-top: 0; margin-bottom: 10px; }
+        .success { background-color: #eaf7ec; color: #28a745; border: 1px solid #a3d9b1; display: flex; }
+        .error { background-color: #fbe9e7; color: #e74c3c; border: 1px solid #f6b8af; display: flex; }
+        .hidden { display: none !important; }
 
-        .success {
-            background-color: #eaf7ec;
-            color: #28a745;
-            border: 1px solid #a3d9b1;
-            display: flex;
-        }
-
-        .error {
-            background-color: #fbe9e7;
-            color: #e74c3c;
-            border: 1px solid #f6b8af;
-            display: flex;
-        }
-
-        .hidden {
-            display: none !important;
-        }
-
-        .modal-overlay,
-        .loader-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+        .modal-overlay, .loader-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0, 0, 0, 0.6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            display: flex; align-items: center; justify-content: center;
             z-index: 1000;
         }
 
         .modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            text-align: center;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            background: white; padding: 30px; border-radius: 8px;
+            text-align: center; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
         }
 
-        .modal-content h3 {
-            margin-top: 0;
-            color: var(--primary-color);
-            border-bottom: none;
-        }
-
-        .modal-actions {
-            margin-top: 20px;
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-        }
+        .modal-content h3 { margin-top: 0; color: var(--primary-color); border-bottom: none; }
+        .modal-actions { margin-top: 20px; display: flex; justify-content: center; gap: 15px; }
 
         .loader {
-            border: 8px solid #f3f3f3;
-            border-radius: 50%;
+            border: 8px solid #f3f3f3; border-radius: 50%;
             border-top: 8px solid var(--primary-color);
-            width: 60px;
-            height: 60px;
+            width: 60px; height: 60px;
             animation: spin 1s linear infinite;
         }
 
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .toast-container {
-            position: fixed;
-            top: 24px;
-            right: 24px;
-            z-index: 2000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+            position: fixed; top: 24px; right: 24px; z-index: 2000;
+            display: flex; flex-direction: column; gap: 10px;
         }
 
         .toast {
-            padding: 16px 24px;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            color: white;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            opacity: 0;
+            padding: 16px 24px; border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); color: white;
+            display: flex; align-items: center; gap: 10px; opacity: 0;
             transform: translateX(100%);
             animation: slideIn 0.5s forwards, fadeOut 0.5s 4.5s forwards;
         }
 
-        .toast.success {
-            background-color: var(--primary-color);
-        }
+        .toast.success { background-color: var(--primary-color); }
+        .toast.error { background-color: var(--danger-color); }
 
-        .toast.error {
-            background-color: var(--danger-color);
-        }
-
-        @keyframes slideIn {
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        @keyframes fadeOut {
-            from {
-                opacity: 1;
-            }
-
-            to {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-        }
+        @keyframes slideIn { to { opacity: 1; transform: translateX(0); } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; transform: translateY(20px); } }
     </style>
 </head>
 
@@ -590,21 +438,16 @@
                         <select id="image-file-selector"></select>
                     </div>
                     <button id="delete-file-button" title="このファイルを削除（非表示に）します">
-                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
-                            </path>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                         </svg>
                     </button>
                 </div>
                 <div class="approval-action">
                     <button id="approve-button">
-                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                            stroke-linecap="round" stroke-linejoin="round">
-                            <path
-                                d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3">
-                            </path>
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path>
                         </svg>
                         選択した行を承認
                     </button>
@@ -635,8 +478,7 @@
 
             <div id="form-wrapper" class="form-wrapper">
                 <div id="form-toggle-header" class="form-toggle-header">
-                    <svg class="toggle-icon" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg class="toggle-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="18 15 12 9 6 15"></polyline>
                     </svg>
                 </div>
@@ -670,30 +512,31 @@
                         <div class="form-footer">
                             <div class="main-actions">
                                 <button type="button" id="add-new-button">
-                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <line x1="12" y1="5" x2="12" y2="19"></line>
                                         <line x1="5" y1="12" x2="19" y2="12"></line>
                                     </svg>
                                     新規追加
                                 </button>
+                                <button type="button" id="duplicate-button">
+                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                    </svg>
+                                    複製
+                                </button>
                                 <button type="button" id="save-sheet-button">
-                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z">
-                                        </path>
+                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
                                         <polyline points="17 21 17 13 7 13 7 21"></polyline>
                                         <polyline points="7 3 7 8 15 8"></polyline>
                                     </svg>
                                     シートに保存
                                 </button>
                                 <button type="button" id="delete-button">
-                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                         <polyline points="3 6 5 6 21 6"></polyline>
-                                        <path
-                                            d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
-                                        </path>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                         <line x1="10" y1="11" x2="10" y2="17"></line>
                                         <line x1="14" y1="11" x2="14" y2="17"></line>
                                     </svg>
@@ -710,7 +553,6 @@
         </div>
     </div>
 
-    <!-- 確認モーダル -->
     <div id="confirm-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <h3 id="modal-title"></h3>
@@ -722,14 +564,12 @@
         </div>
     </div>
 
-    <!-- ローディングスピナー -->
     <div id="loader-overlay" class="loader-overlay hidden">
         <div class="loader"></div>
     </div>
 
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- 外部ライブラリの読み込み -->
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
@@ -752,6 +592,7 @@
         const imageFrame = document.getElementById('image-frame');
         const saveSheetButton = document.getElementById('save-sheet-button');
         const addNewButton = document.getElementById('add-new-button');
+        const duplicateButton = document.getElementById('duplicate-button'); // 追加
         const deleteButton = document.getElementById('delete-button');
         const approveButton = document.getElementById('approve-button');
         const statusMessage = document.getElementById('status-message');
@@ -783,6 +624,7 @@
         let sheetGid = null;
         let imageFileChoices;
         let selectedRowIds = new Set();
+        let formMode = 'append'; // 追加: 'edit', 'insert', 'append', 'bulk_edit'
 
         // --- 初期化処理 ---
         window.onload = () => {
@@ -804,6 +646,7 @@
         authButton.addEventListener('click', handleAuthClick);
         saveSheetButton.addEventListener('click', saveToSheet);
         addNewButton.addEventListener('click', prepareNewRecord);
+        duplicateButton.addEventListener('click', duplicateRecord); // 追加
         deleteButton.addEventListener('click', () => showConfirmModal('delete'));
         approveButton.addEventListener('click', () => showConfirmModal('approve'));
         deleteFileButton.addEventListener('click', () => showConfirmModal('deleteFile'));
@@ -814,9 +657,6 @@
         });
         topPane.addEventListener('click', (event) => {
             if (formWrapper.classList.contains('open')) {
-                // HACK: フォーム自体や、フォームを開くトリガーとなったテーブル以外をクリックした場合にフォームを閉じる
-                // Choices.jsのドロップダウンをクリックした際にも閉じてしまうため、より丁寧な判定が必要だが、
-                // 一旦テーブルコンテナ以外をクリックしたら閉じる、という簡易的な実装にする
                 if (!event.target.closest('.record-table-container') && !event.target.closest('.form-wrapper')) {
                     formWrapper.classList.remove('open');
                 }
@@ -951,7 +791,7 @@
             }
 
             masterData.client = result.data.customers;
-            masterData.product = result.data.products; // {name, number} の配列
+            masterData.product = result.data.products;
             masterData.unit = result.data.units;
             masterData.prices = result.data.prices;
 
@@ -978,7 +818,6 @@
                 return;
             }
 
-            const headers = values[0];
             const dataRows = values.slice(1);
 
             allSheetData = dataRows
@@ -1046,7 +885,6 @@
 
         function populateRecordTable() {
             recordTableBody.innerHTML = '';
-            // selectedRowIds.clear(); // テーブル再描画時に選択をクリアしない
             if (filteredSheetData.length === 0) {
                 recordTableBody.innerHTML = '<tr><td colspan="7" style="text-align:center;">このファイルに対応するレコードはありません。</td></tr>';
                 updateApprovalButtonState();
@@ -1072,7 +910,6 @@
 
                 tr.addEventListener('click', (e) => {
                     if (e.target.type === 'checkbox') return;
-                    // ★修正点1: 行クリックでフォームを開く
                     formWrapper.classList.add('open');
                     displayRecord(record.id, true);
                 });
@@ -1111,12 +948,10 @@
                 selectedRowIds.add(recordId);
             }
             currentRecordId = recordId;
-            updateSelectionUI();
-
+            
             const record = allSheetData.find(r => r.id == recordId);
             if (!record) return;
 
-            // ★修正点2: マスタにない値は選択肢に追加せず、単純にセットを試みる
             masterChoices.client.setChoiceByValue(String(record.client || ''));
             masterChoices.product.setChoiceByValue(String(record.product || ''));
             masterChoices.unit.setChoiceByValue(String(record.unit || ''));
@@ -1126,8 +961,10 @@
             document.getElementById('f-quantity').value = record.quantity;
 
             updateStatus('', '', sheetStatus);
+            updateSelectionUI(); // UI更新の呼び出しを追加
         }
 
+        // --- UI/モード切り替え ---
         function updateSelectionUI() {
             const allRows = recordTableBody.querySelectorAll('tr');
             allRows.forEach(row => {
@@ -1148,6 +985,43 @@
             selectAllCheckbox.checked = allChecked;
 
             updateApprovalButtonState();
+
+            // 選択状況に応じて formMode を切り替え
+            let prevFormMode = formMode;
+            if (selectedRowIds.size > 1) {
+                formMode = 'bulk_edit';
+            } else if (selectedRowIds.size === 1) {
+                formMode = (currentRecordId !== null) ? 'edit' : 'insert';
+            } else {
+                formMode = 'append';
+            }
+
+            // ボタンの表示テキスト・状態変更
+            const saveIcon = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>`;
+
+            if (formMode === 'bulk_edit') {
+                saveSheetButton.innerHTML = saveIcon + ' 選択行を一括更新';
+                duplicateButton.disabled = true;
+                
+                // 初めて一括更新モードに入った時にフォームをクリア
+                if (prevFormMode !== 'bulk_edit') {
+                    currentRecordId = null;
+                    dataForm.reset();
+                    masterChoices.client.setChoiceByValue('');
+                    masterChoices.product.setChoiceByValue('');
+                    masterChoices.unit.setChoiceByValue('');
+                    updateStatus('複数行の一括更新モードです。変更したい項目のみ入力してください。', 'success', sheetStatus);
+                }
+            } else if (formMode === 'edit') {
+                saveSheetButton.innerHTML = saveIcon + ' シートを更新';
+                duplicateButton.disabled = false;
+            } else if (formMode === 'insert') {
+                saveSheetButton.innerHTML = saveIcon + ' 選択行の下に挿入';
+                duplicateButton.disabled = false;
+            } else if (formMode === 'append') {
+                saveSheetButton.innerHTML = saveIcon + ' シート末尾に追加';
+                duplicateButton.disabled = true;
+            }
         }
 
         function updateApprovalButtonState() {
@@ -1159,120 +1033,240 @@
             approveButton.disabled = !hasSelection || hasInvalidSelection;
         }
 
-
-        // --- データ更新関連 ---
-
         function prepareNewRecord() {
-            selectedRowIds.clear();
-            updateSelectionUI();
-            currentRecordId = null;
+            currentRecordId = null; // 編集対象はなしにする
+
+            // 複数選択されている場合は末尾追加にするためクリア、1行選択なら「下に挿入」にするため維持
+            if (selectedRowIds.size > 1) {
+                selectedRowIds.clear();
+            }
+
             dataForm.reset();
             masterChoices.client.setChoiceByValue('');
             masterChoices.product.setChoiceByValue('');
             masterChoices.unit.setChoiceByValue('');
+            
+            updateSelectionUI(); // モード判定とUI更新をトリガー
+            
             updateStatus('新しいレコードを入力できます。', 'success', sheetStatus);
             formWrapper.classList.add('open');
         }
 
+
+        // --- データ更新関連 ---
         async function saveToSheet() {
-            let recordIdToSave;
-            if (currentRecordId !== null) {
-                recordIdToSave = currentRecordId;
-            } else if (selectedRowIds.size === 1) {
-                recordIdToSave = selectedRowIds.values().next().value;
-            } else if (selectedRowIds.size === 0) {
-                // 新規追加の場合
-                recordIdToSave = null;
-            } else {
-                showToast('保存対象は1行にしてください（新規の場合は行選択は不要です）。', 'error');
-                return;
-            }
-
             saveSheetButton.disabled = true;
-
-            const isNewRecord = recordIdToSave === null;
-            const actionText = isNewRecord ? '追加' : '更新';
-            updateStatus(`スプレッドシートに${actionText}しています...`, '', sheetStatus);
             showLoader();
 
             try {
                 const sheetId = document.getElementById('sheet-id').value;
                 const dataRange = document.getElementById('data-range').value;
+                const sheetName = dataRange.split('!')[0];
 
-                const recordToSave = isNewRecord ? null : allSheetData.find(r => r.id === recordIdToSave);
+                const formClient = masterChoices.client.getValue(true);
+                const formDateFromInput = document.getElementById('f-delivery-date').value;
+                const formDateSheet = formDateFromInput ? formDateFromInput.replace(/-/g, '/') : '';
+                const formProduct = masterChoices.product.getValue(true);
+                const formNotes = document.getElementById('f-notes').value;
+                const formQuantity = document.getElementById('f-quantity').value;
+                const formUnit = masterChoices.unit.getValue(true);
 
-                const deliveryDateFromForm = document.getElementById('f-delivery-date').value;
-                const deliveryDateForSheet = deliveryDateFromForm ? deliveryDateFromForm.replace(/-/g, '/') : '';
+                if (formMode === 'bulk_edit') {
+                    // --- 1. 一括更新 ---
+                    updateStatus('複数行を一括更新しています...', '', sheetStatus);
+                    const updates = {};
+                    let hasUpdate = false;
+                    if (formClient) { updates.client = formClient; hasUpdate = true; }
+                    if (formDateSheet) { updates.deliveryDate = formDateSheet; hasUpdate = true; }
+                    if (formProduct) { updates.product = formProduct; hasUpdate = true; }
+                    if (formNotes) { updates.notes = formNotes; hasUpdate = true; } 
+                    if (formQuantity !== '') { updates.quantity = formQuantity; hasUpdate = true; }
+                    if (formUnit) { updates.unit = formUnit; hasUpdate = true; }
 
-                const values = [
-                    masterChoices.client.getValue(true),
-                    deliveryDateForSheet,
-                    masterChoices.product.getValue(true),
-                    document.getElementById('f-notes').value,
-                    document.getElementById('f-quantity').value,
-                    masterChoices.unit.getValue(true),
-                    isNewRecord ? currentFileId : recordToSave.fileId,
-                    isNewRecord ? '0' : recordToSave.status,
-                    '1' // 活性フラグ
-                ];
+                    if (!hasUpdate) throw new Error("一括更新する項目が入力されていません。");
 
-                let savedRecordIndex;
+                    const dataToUpdate = [];
+                    for (const id of selectedRowIds) {
+                        const record = allSheetData.find(r => r.id === id);
+                        if (!record) continue;
+                        const targetRow = record.id + 2;
+                        
+                        const values = [
+                            updates.client !== undefined ? updates.client : record.client,
+                            updates.deliveryDate !== undefined ? updates.deliveryDate : record.deliveryDate,
+                            updates.product !== undefined ? updates.product : record.product,
+                            updates.notes !== undefined ? updates.notes : record.notes,
+                            updates.quantity !== undefined ? updates.quantity : record.quantity,
+                            updates.unit !== undefined ? updates.unit : record.unit,
+                            record.fileId,
+                            record.status,
+                            record.active
+                        ];
+                        dataToUpdate.push({
+                            range: `${sheetName}!A${targetRow}:I${targetRow}`,
+                            values: [[...values]]
+                        });
+                    }
 
-                if (isNewRecord) {
-                    if (!currentFileId) throw new Error("画像ファイルが選択されていません。");
-                    const appendResponse = await gapi.client.sheets.spreadsheets.values.append({
+                    await gapi.client.sheets.spreadsheets.values.batchUpdate({
                         spreadsheetId: sheetId,
-                        range: dataRange,
-                        valueInputOption: 'USER_ENTERED',
-                        insertDataOption: 'INSERT_ROWS',
-                        resource: { values: [values] }
+                        resource: { valueInputOption: 'USER_ENTERED', data: dataToUpdate }
                     });
-                    // 新規追加した場合、最後の行がそれにあたるので、再読み込み後のallSheetDataからIDを取得する
-                } else {
-                    const sheetName = dataRange.split('!')[0];
-                    const targetRow = parseInt(recordIdToSave, 10) + 2;
-                    const updateRange = `${sheetName}!A${targetRow}`;
+                    updateStatus('選択した行を一括更新しました。', 'success', sheetStatus);
+
+                } else if (formMode === 'edit') {
+                    // --- 2. 1行の更新 ---
+                    updateStatus('シートを更新しています...', '', sheetStatus);
+                    const recordToSave = allSheetData.find(r => r.id === currentRecordId);
+                    const targetRow = parseInt(currentRecordId, 10) + 2;
+                    const values = [
+                        formClient, formDateSheet, formProduct, formNotes, formQuantity, formUnit,
+                        recordToSave.fileId, recordToSave.status, '1'
+                    ];
                     await gapi.client.sheets.spreadsheets.values.update({
                         spreadsheetId: sheetId,
-                        range: updateRange,
+                        range: `${sheetName}!A${targetRow}`,
                         valueInputOption: 'USER_ENTERED',
                         resource: { values: [values] }
                     });
-                    savedRecordIndex = recordIdToSave;
+                    updateStatus('シートの更新に成功しました。', 'success', sheetStatus);
+
+                } else {
+                    // --- 3. 新規追加 (挿入 または 末尾) ---
+                    updateStatus('シートに追加しています...', '', sheetStatus);
+                    if (!currentFileId) throw new Error("画像ファイルが選択されていません。");
+                    
+                    const values = [
+                        formClient, formDateSheet, formProduct, formNotes, formQuantity, formUnit,
+                        currentFileId, '0', '1'
+                    ];
+
+                    if (formMode === 'insert') {
+                        // 選択行の下に挿入
+                        const baseRecordId = selectedRowIds.values().next().value;
+                        const insertIndex = baseRecordId + 2; // 0-indexedとしての挿入先
+
+                        // 空行の挿入
+                        await gapi.client.sheets.spreadsheets.batchUpdate({
+                            spreadsheetId: sheetId,
+                            resource: {
+                                requests: [{
+                                    insertDimension: {
+                                        range: { sheetId: sheetGid, dimension: 'ROWS', startIndex: insertIndex, endIndex: insertIndex + 1 },
+                                        inheritFromBefore: true
+                                    }
+                                }]
+                            }
+                        });
+
+                        // データの書き込み
+                        await gapi.client.sheets.spreadsheets.values.update({
+                            spreadsheetId: sheetId,
+                            range: `${sheetName}!A${insertIndex + 1}`,
+                            valueInputOption: 'USER_ENTERED',
+                            resource: { values: [values] }
+                        });
+                        updateStatus('選択行の下に挿入しました。', 'success', sheetStatus);
+                    } else {
+                        // 末尾に追加
+                        await gapi.client.sheets.spreadsheets.values.append({
+                            spreadsheetId: sheetId,
+                            range: dataRange,
+                            valueInputOption: 'USER_ENTERED',
+                            insertDataOption: 'INSERT_ROWS',
+                            resource: { values: [values] }
+                        });
+                        updateStatus('シートの末尾に追加しました。', 'success', sheetStatus);
+                    }
                 }
 
-                // ★修正点3 & 4: 必要なデータだけを再読み込み・再描画し、選択状態を復元
+                // 状態復元
                 await loadSheetData();
                 filteredSheetData = allSheetData.filter(record => record.fileId === currentFileId);
                 populateRecordTable();
-
-                if (isNewRecord) {
-                    // 新規追加した場合、新しく作られたレコードを選択状態にする
-                    // 最もIDが大きいものが新規追加されたものと仮定
-                    const newRecord = filteredSheetData.reduce((prev, current) => (prev.id > current.id) ? prev : current);
-                    if (newRecord) {
-                        displayRecord(newRecord.id, true);
-                    }
-                    prepareNewRecord(); // フォームはクリア
-                } else if (savedRecordIndex !== undefined) {
-                    displayRecord(savedRecordIndex, true);
+                
+                if (formMode === 'edit') {
+                    displayRecord(currentRecordId, true);
+                } else if (formMode === 'bulk_edit') {
+                    // 一括更新後は選択を維持して再描画
+                    updateSelectionUI();
+                } else {
+                    prepareNewRecord(); // 追加後はフォームをリセット
                 }
 
-                updateStatus(`シートの${actionText}に成功しました。`, 'success', sheetStatus);
-
             } catch (error) {
-                console.error(`Google Sheet ${actionText} error:`, error);
+                console.error('Google Sheet save error:', error);
                 const errorMessage = error.result?.error?.message || error.message || '不明なエラーが発生しました。';
-                updateStatus(`${actionText}失敗: ${errorMessage}`, 'error', sheetStatus);
+                updateStatus(`保存失敗: ${errorMessage}`, 'error', sheetStatus);
             } finally {
                 saveSheetButton.disabled = false;
                 hideLoader();
             }
         }
 
+        // --- 複製機能 ---
+        async function duplicateRecord() {
+            if (selectedRowIds.size !== 1) return;
+            
+            const sourceRecordId = selectedRowIds.values().next().value;
+            const sourceRecord = allSheetData.find(r => r.id === sourceRecordId);
+            if (!sourceRecord) return;
+
+            duplicateButton.disabled = true;
+            updateStatus('行を複製しています...', '', sheetStatus);
+            showLoader();
+
+            try {
+                const sheetId = document.getElementById('sheet-id').value;
+                const sheetName = document.getElementById('data-range').value.split('!')[0];
+                
+                const values = [
+                    sourceRecord.client, sourceRecord.deliveryDate, sourceRecord.product,
+                    sourceRecord.notes, sourceRecord.quantity, sourceRecord.unit,
+                    sourceRecord.fileId, '0', '1'
+                ];
+
+                const insertIndex = sourceRecordId + 2; 
+
+                // 選択行の下に空行を挿入
+                await gapi.client.sheets.spreadsheets.batchUpdate({
+                    spreadsheetId: sheetId,
+                    resource: {
+                        requests: [{
+                            insertDimension: {
+                                range: { sheetId: sheetGid, dimension: 'ROWS', startIndex: insertIndex, endIndex: insertIndex + 1 },
+                                inheritFromBefore: true
+                            }
+                        }]
+                    }
+                });
+
+                // データを書き込み
+                await gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: sheetId,
+                    range: `${sheetName}!A${insertIndex + 1}`,
+                    valueInputOption: 'USER_ENTERED',
+                    resource: { values: [values] }
+                });
+
+                await loadSheetData();
+                filteredSheetData = allSheetData.filter(record => record.fileId === currentFileId);
+                populateRecordTable();
+                
+                updateStatus('行を複製しました。', 'success', sheetStatus);
+            } catch (error) {
+                console.error('Duplicate error:', error);
+                updateStatus(`複製失敗: ${error.message}`, 'error', sheetStatus);
+            } finally {
+                duplicateButton.disabled = false;
+                hideLoader();
+            }
+        }
+
+
+        // --- 以下、既存の削除・kintone連携機能 ---
         async function deactivateSheetRow() {
             if (selectedRowIds.size === 0) return;
-
             confirmModal.classList.add('hidden');
             updateStatus('行を削除（非活性化）しています...', '', sheetStatus);
             showLoader();
@@ -1290,21 +1284,15 @@
                 } else {
                     prepareNewRecord();
                 }
-
                 updateStatus('選択した行を削除（非活性化）しました。', 'success', sheetStatus);
-
             } catch (error) {
                 console.error('Google Sheet deactivate error:', error);
-                const errorMessage = error.result?.error?.message || '不明なエラーが発生しました。';
-                updateStatus(`削除失敗: ${errorMessage}`, 'error', sheetStatus);
-            } finally {
-                hideLoader();
-            }
+                updateStatus(`削除失敗: ${error.message}`, 'error', sheetStatus);
+            } finally { hideLoader(); }
         }
 
         async function deactivateFileRecords() {
             if (!currentFileId) return;
-
             confirmModal.classList.add('hidden');
             updateStatus('ファイルを削除（非活性化）しています...', '', sheetStatus);
             showLoader();
@@ -1312,16 +1300,12 @@
             try {
                 const recordsToDeactivate = allSheetData.filter(r => r.fileId === currentFileId);
                 await updateActiveFlagsInSheet(recordsToDeactivate, '0');
-
                 await loadAllData();
                 updateStatus('ファイルを削除（非活性化）しました。', 'success', sheetStatus);
             } catch (error) {
                 console.error('Google Sheet deactivate file error:', error);
-                const errorMessage = error.result?.error?.message || '不明なエラーが発生しました。';
-                updateStatus(`ファイル削除失敗: ${errorMessage}`, 'error', sheetStatus);
-            } finally {
-                hideLoader();
-            }
+                updateStatus(`ファイル削除失敗: ${error.message}`, 'error', sheetStatus);
+            } finally { hideLoader(); }
         }
 
         async function updateActiveFlagsInSheet(records, newFlag) {
@@ -1331,47 +1315,30 @@
 
             const data = records.map(record => {
                 const targetRow = record.id + 2;
-                return {
-                    range: `${sheetName}!${activeFlagColumnLetter}${targetRow}`,
-                    values: [[newFlag]]
-                };
+                return { range: `${sheetName}!${activeFlagColumnLetter}${targetRow}`, values: [[newFlag]] };
             });
 
             await gapi.client.sheets.spreadsheets.values.batchUpdate({
                 spreadsheetId: sheetId,
-                resource: {
-                    valueInputOption: 'RAW',
-                    data: data
-                }
+                resource: { valueInputOption: 'RAW', data: data }
             });
         }
 
-        // --- 承認・kintone連携フロー ---
-
         function showConfirmModal(action) {
             if (action === 'delete') {
-                if (selectedRowIds.size === 0) {
-                    updateStatus('削除する行が選択されていません。', 'error', sheetStatus);
-                    return;
-                }
+                if (selectedRowIds.size === 0) { updateStatus('削除する行が選択されていません。', 'error', sheetStatus); return; }
                 modalTitle.textContent = '削除の確認';
                 modalMessage.textContent = `${selectedRowIds.size}件のレコードを本当に削除しますか？`;
                 confirmActionButton.textContent = 'はい、削除します';
                 confirmActionButton.onclick = deactivateSheetRow;
             } else if (action === 'approve') {
-                if (selectedRowIds.size === 0) {
-                    updateStatus('承認する行が選択されていません。', 'error', sheetStatus);
-                    return;
-                }
+                if (selectedRowIds.size === 0) { updateStatus('承認する行が選択されていません。', 'error', sheetStatus); return; }
                 modalTitle.textContent = '承認の確認';
                 modalMessage.textContent = `${selectedRowIds.size}件のレコードを承認し、kintoneに連携しますか？`;
                 confirmActionButton.textContent = 'はい、承認します';
                 confirmActionButton.onclick = handleApproval;
             } else if (action === 'deleteFile') {
-                if (!currentFileId) {
-                    updateStatus('削除するファイルが選択されていません。', 'error', sheetStatus);
-                    return;
-                }
+                if (!currentFileId) { updateStatus('削除するファイルが選択されていません。', 'error', sheetStatus); return; }
                 modalTitle.textContent = 'ファイル削除の確認';
                 modalMessage.textContent = `このファイルに紐づく全てのレコードを削除（非表示に）しますか？`;
                 confirmActionButton.textContent = 'はい、削除します';
@@ -1386,25 +1353,20 @@
 
             const recordsToProcess = Array.from(selectedRowIds).map(id => allSheetData.find(r => r.id === id));
             if (recordsToProcess.length === 0) {
-                updateStatus('承認対象のレコードがありません。', 'error', sheetStatus);
-                hideLoader();
-                return;
+                updateStatus('承認対象のレコードがありません。', 'error', sheetStatus); hideLoader(); return;
             }
 
             try {
                 await updateStatusesInSheet(recordsToProcess, 1);
                 await postRecordsToKintoneViaGAS(recordsToProcess);
                 await updateStatusesInSheet(recordsToProcess, 2);
-
                 showToast('承認とkintone連携が完了しました。', 'success');
-
             } catch (error) {
                 console.error('Approval process failed:', error);
                 showToast(`連携に失敗しました: ${error.message}`, 'error');
                 await updateStatusesInSheet(recordsToProcess, 0);
             } finally {
-                await loadAllData();
-                hideLoader();
+                await loadAllData(); hideLoader();
             }
         }
 
@@ -1415,18 +1377,12 @@
 
             const data = records.map(record => {
                 const targetRow = record.id + 2;
-                return {
-                    range: `${sheetName}!${statusColumnLetter}${targetRow}`,
-                    values: [[newStatus]]
-                };
+                return { range: `${sheetName}!${statusColumnLetter}${targetRow}`, values: [[newStatus]] };
             });
 
             await gapi.client.sheets.spreadsheets.values.batchUpdate({
                 spreadsheetId: sheetId,
-                resource: {
-                    valueInputOption: 'RAW',
-                    data: data
-                }
+                resource: { valueInputOption: 'RAW', data: data }
             });
         }
 
@@ -1436,59 +1392,34 @@
 
             const recordsForKintone = records.map(r => {
                 const kintoneRecord = { ...r };
-                if (kintoneRecord.deliveryDate) {
-                    kintoneRecord.deliveryDate = formatDateForInput(kintoneRecord.deliveryDate);
-                }
+                if (kintoneRecord.deliveryDate) kintoneRecord.deliveryDate = formatDateForInput(kintoneRecord.deliveryDate);
                 const productInfo = masterData.product.find(p => p.name === r.product);
                 kintoneRecord.productNumber = productInfo ? productInfo.number : null;
 
-                const priceInfo = masterData.prices.find(p =>
-                    p.customer === r.client &&
-                    p.product === r.product &&
-                    p.isBase
-                );
+                const priceInfo = masterData.prices.find(p => p.customer === r.client && p.product === r.product && p.isBase);
                 kintoneRecord.priceId = priceInfo ? priceInfo.priceId : null;
                 kintoneRecord.price = priceInfo ? priceInfo.price : null;
 
                 return kintoneRecord;
             });
 
-            const payload = {
-                action: 'postOrderData',
-                loginName: document.getElementById('kintone-api-user').value,
-                password: document.getElementById('kintone-api-password').value,
-                records: recordsForKintone
-            };
+            const payload = { action: 'postOrderData', loginName: document.getElementById('kintone-api-user').value, password: document.getElementById('kintone-api-password').value, records: recordsForKintone };
 
             const response = await fetch(gasUrl, {
-                method: 'POST',
-                mode: 'cors',
-                headers: {
-                    'Content-Type': 'text/plain;charset=utf-8',
-                },
-                body: JSON.stringify(payload),
+                method: 'POST', mode: 'cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload),
             });
 
             const result = await response.json();
-            if (!result.success) {
-                throw new Error(result.error || 'GAS経由でのkintone連携に失敗しました。');
-            }
+            if (!result.success) throw new Error(result.error || 'GAS経由でのkintone連携に失敗しました。');
             return result;
         }
 
-        // --- ユーティリティ関数 ---
         function showLoader() { loaderOverlay.classList.remove('hidden'); }
         function hideLoader() { loaderOverlay.classList.add('hidden'); }
 
         function updateStatus(message, type, element) {
-            if (!message) {
-                element.className = 'hidden';
-                return;
-            }
-            const icon = type === 'success'
-                ? '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
-                : '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
-
+            if (!message) { element.className = 'hidden'; return; }
+            const icon = type === 'success' ? '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>' : '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
             element.innerHTML = `${icon}<span>${message}</span>`;
             element.className = type;
         }
@@ -1496,35 +1427,22 @@
         function formatDateForInput(dateString) {
             if (!dateString) return '';
             const parts = dateString.split('/');
-            if (parts.length !== 3) return dateString; // yyyy-mm-dd形式など、既にフォーマット済みの場合はそのまま返す
-            const year = parts[0];
-            const month = parts[1].padStart(2, '0');
-            const day = parts[2].padStart(2, '0');
-            if (isNaN(parseInt(year)) || isNaN(parseInt(month)) || isNaN(parseInt(day))) return dateString; // 無効な日付文字列はそのまま
+            if (parts.length !== 3) return dateString;
+            const year = parts[0], month = parts[1].padStart(2, '0'), day = parts[2].padStart(2, '0');
+            if (isNaN(parseInt(year)) || isNaN(parseInt(month)) || isNaN(parseInt(day))) return dateString;
             return `${year}-${month}-${day}`;
         }
 
         function showToast(message, type = 'success') {
             const toastContainer = document.getElementById('toast-container');
             if (!toastContainer) return;
-
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
-
-            const icon = type === 'success'
-                ? '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
-                : '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
-
+            const icon = type === 'success' ? '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>' : '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
             toast.innerHTML = `${icon}<span>${message}</span>`;
-
             toastContainer.appendChild(toast);
-
-            setTimeout(() => {
-                toast.remove();
-            }, 5000);
+            setTimeout(() => toast.remove(), 5000);
         }
-
     </script>
 </body>
-
 </html>
