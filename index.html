@@ -21,7 +21,7 @@
             --highlight-color: #dbe9f6;
             --invalid-row-bg: #fff0f1;
             --invalid-row-text: #d9534f;
-            --duplicate-color: #9b59b6; /* 追加: 複製ボタンの色 */
+            --duplicate-color: #9b59b6;
             --font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
         }
 
@@ -116,6 +116,15 @@
         }
 
         .choices__inner { padding: 8px; }
+        
+        /* 日付一括更新用のスタイル */
+        .bulk-date-inputs {
+            display: flex;
+            gap: 10px;
+        }
+        .bulk-date-inputs input {
+            width: 33.33%;
+        }
 
         /* ボタンのスタイル */
         button {
@@ -151,6 +160,19 @@
         #delete-button { background-color: var(--danger-color); }
         #approve-button { background-color: var(--approval-color); }
         #duplicate-button { background-color: var(--duplicate-color); }
+        
+        /* 追加: PDF開閉ボタン */
+        #toggle-pdf-button {
+            background-color: white;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 10px;
+        }
+        #toggle-pdf-button:hover {
+            background-color: var(--secondary-color);
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
 
         /* --- 新レイアウト用スタイル --- */
         .header-pane {
@@ -316,7 +338,7 @@
             display: flex;
             align-items: center;
             gap: 20px;
-            flex-wrap: wrap; /* ボタンが多いのではみ出さないように */
+            flex-wrap: wrap; 
         }
 
         .main-actions { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -433,6 +455,12 @@
 
             <div class="header-pane">
                 <div class="file-selector-container">
+                    <button id="toggle-pdf-button" type="button" title="PDFプレビューの開閉">
+                        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="9" y1="3" x2="9" y2="21"></line>
+                        </svg>
+                    </button>
                     <div class="file-selector-pane input-group">
                         <label for="image-file-selector">表示する発注書ファイルを選択</label>
                         <select id="image-file-selector"></select>
@@ -455,7 +483,7 @@
             </div>
 
             <div class="top-pane">
-                <div class="image-pane">
+                <div id="image-pane" class="image-pane">
                     <iframe id="image-frame" src="about:blank" title="発注書プレビュー"></iframe>
                 </div>
                 <div class="record-table-container">
@@ -489,10 +517,20 @@
                             <label for="f-client">取引先名</label>
                             <select id="f-client" placeholder="取引先を検索または選択"></select>
                         </div>
+
                         <div class="input-group">
                             <label for="f-delivery-date">納品日付</label>
-                            <input type="date" id="f-delivery-date">
+                            <div id="single-date-wrapper">
+                                <input type="date" id="f-delivery-date">
+                            </div>
+                            <div id="bulk-date-wrapper" class="bulk-date-inputs hidden">
+                                <input type="number" id="f-delivery-year" placeholder="年 (例: 2024)">
+                                <input type="number" id="f-delivery-month" placeholder="月" min="1" max="12">
+                                <input type="number" id="f-delivery-day" placeholder="日" min="1" max="31">
+                            </div>
+                            <small id="bulk-date-hint" class="hidden" style="color: #666; font-size: 0.85em; margin-top: 5px; display: block;">※入力した項目（年・月・日）だけが選択行に上書きされます。</small>
                         </div>
+
                         <div class="input-group">
                             <label for="f-product">商品名</label>
                             <select id="f-product" placeholder="商品を検索または選択"></select>
@@ -592,7 +630,7 @@
         const imageFrame = document.getElementById('image-frame');
         const saveSheetButton = document.getElementById('save-sheet-button');
         const addNewButton = document.getElementById('add-new-button');
-        const duplicateButton = document.getElementById('duplicate-button'); // 追加
+        const duplicateButton = document.getElementById('duplicate-button'); 
         const deleteButton = document.getElementById('delete-button');
         const approveButton = document.getElementById('approve-button');
         const statusMessage = document.getElementById('status-message');
@@ -610,6 +648,9 @@
         const topPane = document.querySelector('.top-pane');
         const deleteFileButton = document.getElementById('delete-file-button');
         const selectAllCheckbox = document.getElementById('select-all-checkbox');
+        
+        const togglePdfButton = document.getElementById('toggle-pdf-button'); // 追加
+        const imagePane = document.getElementById('image-pane');             // 追加
 
         let gapiInited = false;
         let gsiInited = false;
@@ -624,7 +665,7 @@
         let sheetGid = null;
         let imageFileChoices;
         let selectedRowIds = new Set();
-        let formMode = 'append'; // 追加: 'edit', 'insert', 'append', 'bulk_edit'
+        let formMode = 'append'; // 'edit', 'insert', 'append', 'bulk_edit'
 
         // --- 初期化処理 ---
         window.onload = () => {
@@ -646,12 +687,18 @@
         authButton.addEventListener('click', handleAuthClick);
         saveSheetButton.addEventListener('click', saveToSheet);
         addNewButton.addEventListener('click', prepareNewRecord);
-        duplicateButton.addEventListener('click', duplicateRecord); // 追加
+        duplicateButton.addEventListener('click', duplicateRecord);
         deleteButton.addEventListener('click', () => showConfirmModal('delete'));
         approveButton.addEventListener('click', () => showConfirmModal('approve'));
         deleteFileButton.addEventListener('click', () => showConfirmModal('deleteFile'));
         cancelActionButton.addEventListener('click', () => confirmModal.classList.add('hidden'));
         imageFileSelector.addEventListener('change', handleImageFileSelection);
+        
+        // 追加: PDF表示の開閉トグル処理
+        togglePdfButton.addEventListener('click', () => {
+            imagePane.classList.toggle('hidden');
+        });
+        
         formToggleHeader.addEventListener('click', () => {
             formWrapper.classList.toggle('open');
         });
@@ -961,7 +1008,7 @@
             document.getElementById('f-quantity').value = record.quantity;
 
             updateStatus('', '', sheetStatus);
-            updateSelectionUI(); // UI更新の呼び出しを追加
+            updateSelectionUI(); 
         }
 
         // --- UI/モード切り替え ---
@@ -986,7 +1033,6 @@
 
             updateApprovalButtonState();
 
-            // 選択状況に応じて formMode を切り替え
             let prevFormMode = formMode;
             if (selectedRowIds.size > 1) {
                 formMode = 'bulk_edit';
@@ -996,14 +1042,22 @@
                 formMode = 'append';
             }
 
+            const singleDateWrapper = document.getElementById('single-date-wrapper');
+            const bulkDateWrapper = document.getElementById('bulk-date-wrapper');
+            const bulkDateHint = document.getElementById('bulk-date-hint');
+
             // ボタンの表示テキスト・状態変更
             const saveIcon = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>`;
 
             if (formMode === 'bulk_edit') {
                 saveSheetButton.innerHTML = saveIcon + ' 選択行を一括更新';
                 duplicateButton.disabled = true;
+
+                // 一括更新用に日付の入力欄を切り替え
+                singleDateWrapper.classList.add('hidden');
+                bulkDateWrapper.classList.remove('hidden');
+                bulkDateHint.classList.remove('hidden');
                 
-                // 初めて一括更新モードに入った時にフォームをクリア
                 if (prevFormMode !== 'bulk_edit') {
                     currentRecordId = null;
                     dataForm.reset();
@@ -1012,15 +1066,22 @@
                     masterChoices.unit.setChoiceByValue('');
                     updateStatus('複数行の一括更新モードです。変更したい項目のみ入力してください。', 'success', sheetStatus);
                 }
-            } else if (formMode === 'edit') {
-                saveSheetButton.innerHTML = saveIcon + ' シートを更新';
-                duplicateButton.disabled = false;
-            } else if (formMode === 'insert') {
-                saveSheetButton.innerHTML = saveIcon + ' 選択行の下に挿入';
-                duplicateButton.disabled = false;
-            } else if (formMode === 'append') {
-                saveSheetButton.innerHTML = saveIcon + ' シート末尾に追加';
-                duplicateButton.disabled = true;
+            } else {
+                // 通常モードに切り替え
+                singleDateWrapper.classList.remove('hidden');
+                bulkDateWrapper.classList.add('hidden');
+                bulkDateHint.classList.add('hidden');
+
+                if (formMode === 'edit') {
+                    saveSheetButton.innerHTML = saveIcon + ' シートを更新';
+                    duplicateButton.disabled = false;
+                } else if (formMode === 'insert') {
+                    saveSheetButton.innerHTML = saveIcon + ' 選択行の下に挿入';
+                    duplicateButton.disabled = false;
+                } else if (formMode === 'append') {
+                    saveSheetButton.innerHTML = saveIcon + ' シート末尾に追加';
+                    duplicateButton.disabled = true;
+                }
             }
         }
 
@@ -1034,9 +1095,8 @@
         }
 
         function prepareNewRecord() {
-            currentRecordId = null; // 編集対象はなしにする
+            currentRecordId = null; 
 
-            // 複数選択されている場合は末尾追加にするためクリア、1行選択なら「下に挿入」にするため維持
             if (selectedRowIds.size > 1) {
                 selectedRowIds.clear();
             }
@@ -1046,7 +1106,7 @@
             masterChoices.product.setChoiceByValue('');
             masterChoices.unit.setChoiceByValue('');
             
-            updateSelectionUI(); // モード判定とUI更新をトリガー
+            updateSelectionUI(); 
             
             updateStatus('新しいレコードを入力できます。', 'success', sheetStatus);
             formWrapper.classList.add('open');
@@ -1074,14 +1134,18 @@
                 if (formMode === 'bulk_edit') {
                     // --- 1. 一括更新 ---
                     updateStatus('複数行を一括更新しています...', '', sheetStatus);
-                    const updates = {};
+
+                    const bulkYear = document.getElementById('f-delivery-year').value;
+                    const bulkMonth = document.getElementById('f-delivery-month').value;
+                    const bulkDay = document.getElementById('f-delivery-day').value;
+
                     let hasUpdate = false;
-                    if (formClient) { updates.client = formClient; hasUpdate = true; }
-                    if (formDateSheet) { updates.deliveryDate = formDateSheet; hasUpdate = true; }
-                    if (formProduct) { updates.product = formProduct; hasUpdate = true; }
-                    if (formNotes) { updates.notes = formNotes; hasUpdate = true; } 
-                    if (formQuantity !== '') { updates.quantity = formQuantity; hasUpdate = true; }
-                    if (formUnit) { updates.unit = formUnit; hasUpdate = true; }
+                    if (formClient) hasUpdate = true;
+                    if (bulkYear || bulkMonth || bulkDay) hasUpdate = true;
+                    if (formProduct) hasUpdate = true;
+                    if (formNotes) hasUpdate = true;
+                    if (formQuantity !== '') hasUpdate = true;
+                    if (formUnit) hasUpdate = true;
 
                     if (!hasUpdate) throw new Error("一括更新する項目が入力されていません。");
 
@@ -1089,15 +1153,34 @@
                     for (const id of selectedRowIds) {
                         const record = allSheetData.find(r => r.id === id);
                         if (!record) continue;
+
+                        // 行ごとに日付を計算
+                        let dateChanged = false;
+                        let newDateStr = record.deliveryDate || '';
+                        newDateStr = newDateStr.replace(/-/g, '/'); // 念のため正規化
+                        let parts = newDateStr.split('/');
+                        let rYear = parts[0] || '';
+                        let rMonth = parts[1] || '';
+                        let rDay = parts[2] || '';
+
+                        if (bulkYear) { rYear = bulkYear; dateChanged = true; }
+                        if (bulkMonth) { rMonth = bulkMonth.toString().padStart(2, '0'); dateChanged = true; }
+                        if (bulkDay) { rDay = bulkDay.toString().padStart(2, '0'); dateChanged = true; }
+
+                        let finalDate = record.deliveryDate;
+                        if (dateChanged) {
+                            finalDate = [rYear, rMonth, rDay].join('/');
+                            if (finalDate === '//') finalDate = ''; // 年月日全て空だった場合は空文字にする
+                        }
+
                         const targetRow = record.id + 2;
-                        
                         const values = [
-                            updates.client !== undefined ? updates.client : record.client,
-                            updates.deliveryDate !== undefined ? updates.deliveryDate : record.deliveryDate,
-                            updates.product !== undefined ? updates.product : record.product,
-                            updates.notes !== undefined ? updates.notes : record.notes,
-                            updates.quantity !== undefined ? updates.quantity : record.quantity,
-                            updates.unit !== undefined ? updates.unit : record.unit,
+                            formClient ? formClient : record.client,
+                            dateChanged ? finalDate : record.deliveryDate,
+                            formProduct ? formProduct : record.product,
+                            formNotes ? formNotes : record.notes,
+                            formQuantity !== '' ? formQuantity : record.quantity,
+                            formUnit ? formUnit : record.unit,
                             record.fileId,
                             record.status,
                             record.active
@@ -1144,7 +1227,7 @@
                     if (formMode === 'insert') {
                         // 選択行の下に挿入
                         const baseRecordId = selectedRowIds.values().next().value;
-                        const insertIndex = baseRecordId + 2; // 0-indexedとしての挿入先
+                        const insertIndex = baseRecordId + 2;
 
                         // 空行の挿入
                         await gapi.client.sheets.spreadsheets.batchUpdate({
@@ -1191,7 +1274,7 @@
                     // 一括更新後は選択を維持して再描画
                     updateSelectionUI();
                 } else {
-                    prepareNewRecord(); // 追加後はフォームをリセット
+                    prepareNewRecord(); 
                 }
 
             } catch (error) {
